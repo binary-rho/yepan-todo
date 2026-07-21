@@ -2,11 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { Check } from 'lucide-react'
-import type { User } from '@/types'
-import { initials } from '@/lib/date'
-import { requestLoginLink, devLogin } from '@/lib/actions'
+import { requestLoginLink } from '@/lib/auth-actions'
 
-export function LoginView({ users }: { users: User[] }) {
+export function LoginView({ next }: { next?: string }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -15,7 +13,7 @@ export function LoginView({ users }: { users: User[] }) {
   function send() {
     setError(null)
     startTransition(async () => {
-      const result = await requestLoginLink(email.trim())
+      const result = await requestLoginLink(email.trim(), next)
       if (!result.ok) {
         setError(result.error)
         return
@@ -33,26 +31,6 @@ export function LoginView({ users }: { users: User[] }) {
           </div>
           <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">메일을 확인해주세요</h1>
           <p className="text-[13px] text-zinc-500 mt-1 tracking-tight">{email} 로 로그인 링크를 발송했습니다.</p>
-
-          <div className="mt-5 pt-4 border-t border-zinc-100">
-            <p className="text-[11px] text-zinc-400 tracking-tight mb-2 font-medium uppercase">개발용 빠른 로그인</p>
-            <div className="space-y-1.5">
-              {users.map(u => (
-                <button
-                  key={u.id}
-                  className="w-full text-left px-3 py-2 text-[13px] border border-zinc-200 rounded hover:bg-zinc-50 transition-colors tracking-tight flex items-center justify-between disabled:opacity-40"
-                  onClick={() => startTransition(() => devLogin(u.id))}
-                  disabled={isPending}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-zinc-200 text-zinc-600 text-[10px] font-medium">{initials(u.name)}</span>
-                    <span className="text-zinc-800">{u.name}</span>
-                  </span>
-                  <span className="text-[11px] text-zinc-400">{u.role === 'admin' ? '관리자' : '담당자'}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     )

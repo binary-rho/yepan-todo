@@ -1,17 +1,14 @@
 'use server'
 
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import type { Task, TaskHistory } from '@/types'
-import { getCurrentUser, DEV_SESSION_COOKIE } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/auth'
 import { validateTransition } from '@/lib/transitions'
 import {
   taskInputSchema,
   statusChangeSchema,
   commentSchema,
   templateUseSchema,
-  emailSchema,
 } from '@/lib/validation'
 import {
   users,
@@ -32,26 +29,6 @@ function nowIso(): string {
 
 function recordHistory(entry: Omit<TaskHistory, 'id' | 'createdAt'>): void {
   taskHistories.push({ id: crypto.randomUUID(), createdAt: nowIso(), ...entry })
-}
-
-export async function requestLoginLink(email: string): Promise<ActionResult> {
-  const parsed = emailSchema.safeParse(email)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
-  const exists = users.some((u) => u.email.toLowerCase() === parsed.data.toLowerCase())
-  if (!exists) return { ok: false, error: '등록되지 않은 이메일입니다. 관리자에게 문의해주세요.' }
-  return { ok: true }
-}
-
-export async function devLogin(userId: string): Promise<void> {
-  const user = users.find((u) => u.id === userId)
-  if (!user) return
-  cookies().set(DEV_SESSION_COOKIE, user.id, { httpOnly: true, sameSite: 'lax', path: '/' })
-  redirect(user.role === 'admin' ? '/board' : '/')
-}
-
-export async function logout(): Promise<void> {
-  cookies().delete(DEV_SESSION_COOKIE)
-  redirect('/login')
 }
 
 export async function changeTaskStatus(input: {

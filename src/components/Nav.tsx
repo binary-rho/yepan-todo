@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { initials } from '@/lib/date'
-import { logout } from '@/lib/actions'
+import { logout } from '@/lib/auth-actions'
 
 const NAV_ITEMS = [
   { label: '내 할 일', href: '/', adminOnly: false },

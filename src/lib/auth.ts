@@ -1,16 +1,19 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { User } from '@/types'
-import { users } from '@/lib/mock-data'
-
-// TODO(supabase): 인증 단계에서 Supabase Auth 세션 기반으로 교체한다.
-// 컴포넌트/페이지가 의존하는 시그니처(getCurrentUser / requireUser)는 유지한다.
-export const DEV_SESSION_COOKIE = 'dev_user_id'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { mapUser } from '@/lib/db/mappers'
 
 export async function getCurrentUser(): Promise<User | null> {
-  const userId = cookies().get(DEV_SESSION_COOKIE)?.value
-  if (!userId) return null
-  return users.find((u) => u.id === userId) ?? null
+  const supabase = createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // 사전 등록된 users 프로필이 있어야만 유효한 로그인으로 인정한다.
+  const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
+  if (!data) return null
+  return mapUser(data)
 }
 
 export async function requireUser(): Promise<User> {
