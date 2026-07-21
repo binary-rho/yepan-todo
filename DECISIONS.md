@@ -1,0 +1,55 @@
+# 의사결정 기록 (DECISIONS)
+
+백엔드 연동 과정에서 확인 없이 스스로 판단한 사항과 근거를 정리한다.
+
+## 아키텍처
+
+### 1. Vite SPA → Next.js(App Router) 마이그레이션
+명세는 Server Actions, 미들웨어, RSC, Vercel Cron, `/tasks/[id]` 딥링크를 전제하지만, 인수받은 산출물은 Vite + React SPA 였다. Vite 에서는 이 요구를 구현할 수 없어 Next.js(App Router)로 마이그레이션했다. 기존 JSX/Tailwind 마크업은 보존하고 라우트 분리와 서버/클라이언트 분리만 수행했다. (사용자 확인을 받은 유일한 지점)
+
+### 2. Next.js 14 + React 18 채택
+기존 `peerDependencies` 가 React 18.3.1 이라 호환성을 위해 Next 14(App Router, Server Actions 안정판)를 선택했다. Next 14.2.x 는 보안 패치 버전(14.2.35)으로 고정했다.
+
+### 3. `src/` 디렉터리 + `@/*` alias 유지
+기존 코드가 `src/` 기준이므로 `src/app` 구조를 유지했다. 명세의 `lib/db/...`, `types/index.ts`, `lib/notifications/` 는 각각 `src/lib/db/...`, `src/types/index.ts`, `src/lib/notifications/` 로 해석했다. `supabase/` 와 `middleware.ts` 는 루트에 둔다.
+
+### 4. 미사용 의존성/컴포넌트 제거
+Figma 템플릿이 포함한 다수의 미사용 라이브러리(MUI, recharts, react-dnd, embla, sonner, 다수 radix 등)와 화면에서 쓰이지 않는 shadcn `ui/` 컴포넌트를 제거했다. 실제 화면은 lucide 아이콘 + 순수 마크업만 사용한다.
+
+## 데이터/타입
+
+### 5. `changed_by` 는 이름으로 매핑
+DB `task_history.changed_by` 는 uuid 지만 기존 화면은 사람 이름 문자열을 렌더한다. 마크업 보존을 위해 조회 계층에서 uuid → 이름으로 변환해 `TaskHistory.changedBy` 에 이름을 담는다.
+
+### 6. `Template.itemCount` 는 파생 값
+정본 타입에는 없지만 `/templates` 화면이 사용한다. DB 컬럼이 아니라 `template_items` 개수에서 매퍼가 계산한다. (HANDOFF_REPORT 4-1 참조)
+
+### 7. DB 타입은 수동 정의
+`any` 금지 원칙에 따라 `src/lib/db/database.types.ts` 를 스키마와 1:1로 수동 작성했다. 로컬 Supabase 연결 후 `npm run gen:types` 로 자동 생성본으로 교체 가능하다.
+
+## 권한/인증
+
+### 8. 사전 등록 이메일만 로그인
+매직 링크는 `signInWithOtp({ shouldCreateUser: false })` 로 발송해 auth.users 에 존재하는(사전 등록된) 이메일만 링크를 받는다. `getCurrentUser` 는 추가로 `public.users` 프로필 존재를 확인한다.
+
+### 9. 항목 수정 버튼은 관리자에게만 노출
+명세에 항목 수정 권한 주체가 명시되지 않아, 생성과 동일하게 관리자 전용으로 판단했다. 서버(액션 + RLS)에서 강제하고 UI 버튼도 관리자에게만 노출한다.
+
+### 10. 담당자 tasks 컬럼 제한은 서버 액션이 담당
+RLS 는 행 단위라 담당자가 자신의 task 행을 update 하는 것까지만 통제한다. 담당자가 상태 외 필드를 바꾸지 못하도록 하는 컬럼 단위 제한은 서버 액션(담당자는 상태 전환만 허용)이 담당한다.
+
+## 알림
+
+### 11. 웹훅은 단일 채널, 수신자는 메시지 본문으로 구분
+웹훅이 단방향·단일 채널이라 사용자별 라우팅이 불가능하므로, 메시지 본문에 담당자 이름을 넣어 구분한다.
+
+### 12. dedupe 는 다이제스트 단위
+크론 다이제스트는 담당자당 한 건으로 합쳐 보내므로 dedupe_key 를 `digest:{user_id}:{date}`, 관리자 마감초과 통지는 `overdue_admin:{date}` 로 구성했다(명세의 `due_soon:{task_id}:{date}` 형식을 다이제스트 단위로 일반화). 즉시 발송 알림은 dedupe 대상이 아니라 로그를 남기지 않는다.
+
+### 13. 알림 실패는 액션을 실패시키지 않음
+웹훅 전송 실패가 사용자 액션 전체를 막지 않도록 전송을 try/catch 로 감싸 콘솔에 기록한다. 입력 검증 실패는 기존 UI 오류 표시로 사용자에게 명확히 알린다.
+
+## 스토리지
+
+### 14. 스크린샷 표시 위치 추가
+기존 화면은 스크린샷을 저장/표시하지 않았다. `Task.screenshotUrl` 이 타입/DB 에 존재하므로, 완료 요청 시 파일 업로드(비공개 버킷) 후 상세 화면에 서명 URL 링크("스크린샷 보기")를 기존 톤으로 추가했다.
