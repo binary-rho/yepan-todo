@@ -1,10 +1,16 @@
-import type { Comment, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
 import { createSupabaseDbClient } from '@/lib/supabase/server'
-import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate } from '@/lib/db/mappers'
+import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate, mapSchedulePhase } from '@/lib/db/mappers'
 import { readSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
 
 export async function getWebhookUrl(): Promise<string | null> {
   return readSetting(createSupabaseDbClient(), WEBHOOK_SETTING_KEY)
+}
+
+export async function getSchedulePhases(): Promise<SchedulePhase[]> {
+  const supabase = createSupabaseDbClient()
+  const { data } = await supabase.from('schedule_phases').select('*').order('sort_order')
+  return (data ?? []).map(mapSchedulePhase)
 }
 
 type NameResolver = (userId: string) => string

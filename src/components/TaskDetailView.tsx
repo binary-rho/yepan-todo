@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
-import type { Comment, Task, TaskHistory, TaskStatus, User } from '@/types'
+import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
 import { changeTaskStatus, addComment, updateTask, requestReviewWithScreenshot } from '@/lib/actions'
 import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
@@ -18,9 +18,10 @@ interface TaskDetailViewProps {
   histories: TaskHistory[]
   currentUser: User
   screenshotUrl: string | null
+  phases: SchedulePhase[]
 }
 
-export function TaskDetailView({ task, userList, comments, histories, currentUser, screenshotUrl }: TaskDetailViewProps) {
+export function TaskDetailView({ task, userList, comments, histories, currentUser, screenshotUrl, phases }: TaskDetailViewProps) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const [commentText, setCommentText] = useState('')
@@ -361,6 +362,7 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
         <TaskModal
           task={task}
           userList={userList}
+          phases={phases}
           onClose={() => setShowEdit(false)}
           onSubmit={handleEdit}
         />

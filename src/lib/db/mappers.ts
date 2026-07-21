@@ -1,4 +1,4 @@
-import type { Comment, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
 import type { Database } from '@/lib/db/database.types'
 import type { TaskInput } from '@/lib/validation'
 
@@ -7,6 +7,7 @@ type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskHistoryRow = Database['public']['Tables']['task_history']['Row']
 type CommentRow = Database['public']['Tables']['comments']['Row']
 type TemplateRow = Database['public']['Tables']['templates']['Row']
+type SchedulePhaseRow = Database['public']['Tables']['schedule_phases']['Row']
 
 export function mapUser(row: UserRow): User {
   return { id: row.id, email: row.email, name: row.name, role: row.role }
@@ -60,6 +61,16 @@ export function mapTemplate(row: TemplateRow, itemCount: number): Template {
     name: row.name,
     description: row.description,
     itemCount,
+  }
+}
+
+export function mapSchedulePhase(row: SchedulePhaseRow): SchedulePhase {
+  return {
+    id: row.id,
+    name: row.name,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    sortOrder: row.sort_order,
   }
 }
 

@@ -50,3 +50,11 @@ export interface Template {
   description: string | null
   itemCount: number
 }
+
+export interface SchedulePhase {
+  id: string
+  name: string
+  startDate: string
+  endDate: string | null
+  sortOrder: number
+}

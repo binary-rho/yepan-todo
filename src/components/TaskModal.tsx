@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
-import type { Environment, Task, User } from '@/types'
+import type { Environment, SchedulePhase, Task, User } from '@/types'
 import type { ActionResult } from '@/lib/actions'
 
 export interface TaskFormData {
@@ -20,16 +20,23 @@ export interface TaskFormData {
 interface TaskModalProps {
   task?: Task
   userList: User[]
+  phases: SchedulePhase[]
   onClose: () => void
   onSubmit: (data: TaskFormData) => Promise<ActionResult>
 }
 
-export function TaskModal({ task, userList, onClose, onSubmit }: TaskModalProps) {
+function phaseLabel(phase: SchedulePhase): string {
+  const range = phase.endDate ? `${phase.startDate} ~ ${phase.endDate}` : phase.startDate
+  return `${phase.name} (${range})`
+}
+
+export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskModalProps) {
   const [title, setTitle] = useState(task?.title ?? '')
   const [desc, setDesc] = useState(task?.description ?? '')
   const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? '')
   const [env, setEnv] = useState<Environment>(task?.environment ?? 'dev')
   const [dueDate, setDueDate] = useState(task?.dueDate ?? '')
+  const [selectedPhaseId, setSelectedPhaseId] = useState('')
   const [blocking, setBlocking] = useState(task?.isBlocking ?? false)
   const [confUrl, setConfUrl] = useState(task?.confluenceUrl ?? '')
   const [verifyUrl, setVerifyUrl] = useState(task?.verifyUrl ?? '')
@@ -39,6 +46,12 @@ export function TaskModal({ task, userList, onClose, onSubmit }: TaskModalProps)
   const [isPending, startTransition] = useTransition()
 
   const assignees = userList.filter(u => u.role === 'assignee')
+
+  function handlePhaseChange(phaseId: string) {
+    setSelectedPhaseId(phaseId)
+    const phase = phases.find(p => p.id === phaseId)
+    if (phase) setDueDate(phase.startDate)
+  }
 
   function submit() {
     const e: Record<string, string> = {}
@@ -130,6 +143,21 @@ export function TaskModal({ task, userList, onClose, onSubmit }: TaskModalProps)
               </select>
             </div>
           </div>
+
+          {phases.length > 0 && (
+            <div>
+              <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">일정 국면</label>
+              <select
+                className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white"
+                value={selectedPhaseId}
+                onChange={e => handlePhaseChange(e.target.value)}
+              >
+                <option value="">선택 안 함 (마감일 직접 입력)</option>
+                {phases.map(p => <option key={p.id} value={p.id}>{phaseLabel(p)}</option>)}
+              </select>
+              <p className="text-[11px] text-zinc-400 mt-0.5 tracking-tight">국면을 고르면 시작일이 마감일로 채워집니다. 아래에서 직접 수정할 수도 있습니다.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

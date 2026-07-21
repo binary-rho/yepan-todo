@@ -1,6 +1,12 @@
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth'
-import { getTaskById, getUsers, getCommentsForTask, getHistoriesForTask } from '@/lib/db/queries'
+import {
+  getTaskById,
+  getUsers,
+  getCommentsForTask,
+  getHistoriesForTask,
+  getSchedulePhases,
+} from '@/lib/db/queries'
 import { getScreenshotSignedUrl } from '@/lib/storage'
 import { TaskDetailView } from '@/components/TaskDetailView'
 
@@ -11,11 +17,12 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   const task = await getTaskById(params.id)
   if (!task) notFound()
 
-  const [users, comments, histories, screenshotUrl] = await Promise.all([
+  const [users, comments, histories, screenshotUrl, phases] = await Promise.all([
     getUsers(),
     getCommentsForTask(task.id),
     getHistoriesForTask(task.id),
     task.screenshotUrl ? getScreenshotSignedUrl(task.screenshotUrl) : Promise.resolve(null),
+    getSchedulePhases(),
   ])
 
   return (
@@ -26,6 +33,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
       histories={histories}
       currentUser={currentUser}
       screenshotUrl={screenshotUrl}
+      phases={phases}
     />
   )
 }

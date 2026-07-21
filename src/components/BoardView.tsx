@@ -2,28 +2,31 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Filter } from 'lucide-react'
-import type { Environment, Task, User } from '@/types'
+import { Plus, FileText, Filter, CalendarRange } from 'lucide-react'
+import type { Environment, SchedulePhase, Task, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { createTask } from '@/lib/actions'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
 import { WebhookSettingField } from '@/components/WebhookSettingField'
+import { SchedulePhasesModal } from '@/components/SchedulePhasesModal'
 
 interface BoardViewProps {
   tasks: Task[]
   userList: User[]
   rejectionReasons: Record<string, string | null>
   webhookUrl: string | null
+  phases: SchedulePhase[]
 }
 
-export function BoardView({ tasks, userList, rejectionReasons, webhookUrl }: BoardViewProps) {
+export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phases }: BoardViewProps) {
   const router = useRouter()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
   const [blockingOnly, setBlockingOnly] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
 
   const assignees = userList.filter(u => u.role === 'assignee')
 
@@ -52,6 +55,13 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl }: Boa
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">전체 보드</h1>
         <div className="flex gap-2">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            onClick={() => setScheduleModalOpen(true)}
+          >
+            <CalendarRange size={13} />
+            일정
+          </button>
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
             onClick={() => router.push('/templates')}
@@ -157,8 +167,20 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl }: Boa
       {taskModalOpen && (
         <TaskModal
           userList={userList}
+          phases={phases}
           onClose={() => setTaskModalOpen(false)}
           onSubmit={handleCreate}
+        />
+      )}
+
+      {scheduleModalOpen && (
+        <SchedulePhasesModal
+          phases={phases}
+          onClose={() => setScheduleModalOpen(false)}
+          onSaved={() => {
+            setScheduleModalOpen(false)
+            router.refresh()
+          }}
         />
       )}
     </div>

@@ -247,6 +247,33 @@ export interface Database {
         }
         Relationships: []
       }
+      schedule_phases: {
+        Row: {
+          id: string
+          name: string
+          start_date: string
+          end_date: string | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          start_date: string
+          end_date?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          start_date?: string
+          end_date?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: {

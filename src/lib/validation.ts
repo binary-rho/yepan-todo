@@ -60,3 +60,14 @@ export const templateUseSchema = z.object({
 export const emailSchema = z.string().trim().email('올바른 이메일 형식이 아닙니다.')
 
 export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
+
+const dateString = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')
+
+export const schedulePhaseSchema = z.object({
+  name: z.string().trim().min(1, '국면 이름을 입력해주세요.'),
+  startDate: dateString,
+  endDate: dateString.nullable().or(z.literal('').transform(() => null)),
+})
+
+export const schedulePhasesSchema = z.array(schedulePhaseSchema)
+export type SchedulePhaseInput = z.infer<typeof schedulePhaseSchema>

@@ -21,6 +21,7 @@ import {
   commentSchema,
   templateUseSchema,
   webhookUrlSchema,
+  schedulePhasesSchema,
 } from '@/lib/validation'
 import type { TaskStatus } from '@/types'
 
@@ -269,6 +270,36 @@ export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { ok } = await writeSetting(supabase, WEBHOOK_SETTING_KEY, trimmed || null)
   if (!ok) return { ok: false, error: '웹훅 URL 저장에 실패했습니다.' }
+
+  revalidatePath('/board')
+  return { ok: true }
+}
+
+// 일정(국면 목록)은 전체 교체 방식으로 저장한다. (국면 수가 적고 순서 관리가 단순함)
+export async function saveSchedulePhases(input: unknown): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 일정을 편집할 수 있습니다.' }
+
+  const parsed = schedulePhasesSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const { error: deleteError } = await supabase
+    .from('schedule_phases')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000')
+  if (deleteError) return { ok: false, error: '일정 저장에 실패했습니다.' }
+
+  if (parsed.data.length > 0) {
+    const rows = parsed.data.map((phase, index) => ({
+      name: phase.name,
+      start_date: phase.startDate,
+      end_date: phase.endDate,
+      sort_order: index,
+    }))
+    const { error: insertError } = await supabase.from('schedule_phases').insert(rows)
+    if (insertError) return { ok: false, error: '일정 저장에 실패했습니다.' }
+  }
 
   revalidatePath('/board')
   return { ok: true }
