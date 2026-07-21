@@ -1,0 +1,247 @@
+// 이 파일은 supabase/migrations 스키마와 1:1로 대응하는 타입 정의다.
+// Supabase CLI 연결 시 `npm run gen:types` 로 자동 생성본으로 교체할 수 있다.
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export type TaskStatusDb = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
+export type EnvironmentDb = 'dev' | 'stg' | 'prd'
+export type UserRoleDb = 'admin' | 'assignee'
+
+export interface Database {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          name: string
+          role: UserRoleDb
+          messenger_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          name: string
+          role?: UserRoleDb
+          messenger_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          name?: string
+          role?: UserRoleDb
+          messenger_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          assignee_id: string
+          status: TaskStatusDb
+          environment: EnvironmentDb
+          due_date: string | null
+          is_blocking: boolean
+          confluence_url: string | null
+          verify_url: string | null
+          verify_point: string | null
+          screenshot_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          assignee_id: string
+          status?: TaskStatusDb
+          environment: EnvironmentDb
+          due_date?: string | null
+          is_blocking?: boolean
+          confluence_url?: string | null
+          verify_url?: string | null
+          verify_point?: string | null
+          screenshot_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          assignee_id?: string
+          status?: TaskStatusDb
+          environment?: EnvironmentDb
+          due_date?: string | null
+          is_blocking?: boolean
+          confluence_url?: string | null
+          verify_url?: string | null
+          verify_point?: string | null
+          screenshot_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_history: {
+        Row: {
+          id: string
+          task_id: string
+          from_status: TaskStatusDb | null
+          to_status: TaskStatusDb
+          changed_by: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          from_status?: TaskStatusDb | null
+          to_status: TaskStatusDb
+          changed_by: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          from_status?: TaskStatusDb | null
+          to_status?: TaskStatusDb
+          changed_by?: string
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          id: string
+          task_id: string
+          author_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          author_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      template_items: {
+        Row: {
+          id: string
+          template_id: string
+          title: string
+          description: string | null
+          environment: EnvironmentDb | null
+          is_blocking: boolean
+          confluence_url: string | null
+          verify_url: string | null
+          verify_point: string | null
+          default_assignee_id: string | null
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          title: string
+          description?: string | null
+          environment?: EnvironmentDb | null
+          is_blocking?: boolean
+          confluence_url?: string | null
+          verify_url?: string | null
+          verify_point?: string | null
+          default_assignee_id?: string | null
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          title?: string
+          description?: string | null
+          environment?: EnvironmentDb | null
+          is_blocking?: boolean
+          confluence_url?: string | null
+          verify_url?: string | null
+          verify_point?: string | null
+          default_assignee_id?: string | null
+        }
+        Relationships: []
+      }
+      notification_log: {
+        Row: {
+          id: string
+          task_id: string | null
+          user_id: string
+          kind: string
+          sent_at: string
+          dedupe_key: string
+        }
+        Insert: {
+          id?: string
+          task_id?: string | null
+          user_id: string
+          kind: string
+          sent_at?: string
+          dedupe_key: string
+        }
+        Update: {
+          id?: string
+          task_id?: string | null
+          user_id?: string
+          kind?: string
+          sent_at?: string
+          dedupe_key?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: Record<never, never>
+    Functions: {
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+    }
+    Enums: {
+      task_status: TaskStatusDb
+      environment: EnvironmentDb
+      user_role: UserRoleDb
+    }
+    CompositeTypes: Record<never, never>
+  }
+}
