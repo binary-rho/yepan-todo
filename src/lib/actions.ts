@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
+import { uploadScreenshot } from '@/lib/storage'
 import {
   taskInputSchema,
   statusChangeSchema,
@@ -58,6 +59,58 @@ export async function changeTaskStatus(input: {
     .update({ status: parsed.data.toStatus as TaskStatus })
     .eq('id', task.id)
   if (updateError) return { ok: false, error: '상태 변경에 실패했습니다.' }
+
+  revalidateBoards(task.id)
+  return { ok: true }
+}
+
+// in_progress → review_requested 전환 시 스크린샷을 함께 첨부한다(선택).
+export async function requestReviewWithScreenshot(formData: FormData): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: '로그인이 필요합니다.' }
+
+  const taskId = String(formData.get('taskId') ?? '')
+  if (!taskId) return { ok: false, error: '항목 정보가 없습니다.' }
+
+  const supabase = createSupabaseServerClient()
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, status, assignee_id')
+    .eq('id', taskId)
+    .maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
+
+  const check = validateTransition(task.status, 'review_requested', user.role, null)
+  if (!check.ok) return { ok: false, error: check.reason }
+
+  const file = formData.get('screenshot')
+  if (file instanceof File && file.size > 0) {
+    try {
+      const path = await uploadScreenshot(task.id, file)
+      const { error: urlError } = await supabase
+        .from('tasks')
+        .update({ screenshot_url: path })
+        .eq('id', task.id)
+      if (urlError) return { ok: false, error: '스크린샷 저장에 실패했습니다.' }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : '스크린샷 업로드에 실패했습니다.' }
+    }
+  }
+
+  const { error: historyError } = await supabase.from('task_history').insert({
+    task_id: task.id,
+    from_status: task.status,
+    to_status: 'review_requested',
+    changed_by: user.id,
+    reason: null,
+  })
+  if (historyError) return { ok: false, error: '상태 변경 이력 기록에 실패했습니다.' }
+
+  const { error: updateError } = await supabase
+    .from('tasks')
+    .update({ status: 'review_requested' })
+    .eq('id', task.id)
+  if (updateError) return { ok: false, error: '완료 요청에 실패했습니다.' }
 
   revalidateBoards(task.id)
   return { ok: true }

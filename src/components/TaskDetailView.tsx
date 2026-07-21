@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
+import { ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
 import type { Comment, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
-import { changeTaskStatus, addComment, updateTask } from '@/lib/actions'
+import { changeTaskStatus, addComment, updateTask, requestReviewWithScreenshot } from '@/lib/actions'
 import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
@@ -17,14 +17,15 @@ interface TaskDetailViewProps {
   comments: Comment[]
   histories: TaskHistory[]
   currentUser: User
+  screenshotUrl: string | null
 }
 
-export function TaskDetailView({ task, userList, comments, histories, currentUser }: TaskDetailViewProps) {
+export function TaskDetailView({ task, userList, comments, histories, currentUser, screenshotUrl }: TaskDetailViewProps) {
   const router = useRouter()
+  const fileRef = useRef<HTMLInputElement>(null)
   const [commentText, setCommentText] = useState('')
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
-  const [screenshotNote, setScreenshotNote] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -40,6 +41,22 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
     setActionError(null)
     startTransition(async () => {
       const result = await changeTaskStatus({ taskId: task.id, toStatus: newStatus, reason: reason ?? null })
+      if (!result.ok) {
+        setActionError(result.error)
+        return
+      }
+      router.refresh()
+    })
+  }
+
+  function submitReview() {
+    setActionError(null)
+    const formData = new FormData()
+    formData.set('taskId', task.id)
+    const file = fileRef.current?.files?.[0]
+    if (file) formData.set('screenshot', file)
+    startTransition(async () => {
+      const result = await requestReviewWithScreenshot(formData)
       if (!result.ok) {
         setActionError(result.error)
         return
@@ -154,6 +171,22 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
             </div>
           )}
 
+          {screenshotUrl && (
+            <div className="bg-white border border-zinc-200 rounded p-4">
+              <p className="text-[12px] font-medium text-zinc-500 tracking-tight mb-2">첨부 스크린샷</p>
+              <a
+                href={screenshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-[13px] text-zinc-700 hover:text-zinc-900 tracking-tight group"
+              >
+                <ExternalLink size={13} className="text-zinc-400 shrink-0" />
+                스크린샷 보기
+                <ExternalLink size={11} className="text-zinc-300 group-hover:text-zinc-500" />
+              </a>
+            </div>
+          )}
+
           {task.status !== 'done' && (
             <div className="bg-white border border-zinc-200 rounded p-4">
               <p className="text-[12px] font-medium text-zinc-500 tracking-tight mb-3">상태 변경</p>
@@ -173,16 +206,15 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
                   <div>
                     <label className="block text-[12px] text-zinc-500 tracking-tight mb-1">스크린샷 첨부 <span className="text-zinc-400">(선택)</span></label>
                     <input
-                      type="text"
-                      className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
-                      value={screenshotNote}
-                      onChange={e => setScreenshotNote(e.target.value)}
-                      placeholder="스크린샷 URL 또는 메모"
+                      ref={fileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="w-full text-[13px] tracking-tight text-zinc-600 file:mr-3 file:px-3 file:py-1.5 file:text-[13px] file:border file:border-zinc-200 file:rounded file:bg-white file:text-zinc-600 hover:file:bg-zinc-50"
                     />
                   </div>
                   <button
                     className="px-3 py-1.5 text-[13px] border border-amber-300 rounded text-amber-700 hover:bg-amber-50 transition-colors tracking-tight disabled:opacity-40"
-                    onClick={() => runStatusChange('review_requested')}
+                    onClick={submitReview}
                     disabled={isPending}
                   >
                     완료 요청
