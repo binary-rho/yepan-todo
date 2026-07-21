@@ -1,48 +1,53 @@
 import type { Comment, Task, TaskHistory, Template, User } from '@/types'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate } from '@/lib/db/mappers'
+import { readSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
+
+export async function getWebhookUrl(): Promise<string | null> {
+  return readSetting(createSupabaseDbClient(), WEBHOOK_SETTING_KEY)
+}
 
 type NameResolver = (userId: string) => string
 
 async function buildNameResolver(): Promise<NameResolver> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('users').select('id, name')
   const map = new Map((data ?? []).map((u) => [u.id, u.name]))
   return (userId: string) => map.get(userId) ?? '알 수 없음'
 }
 
 export async function getUsers(): Promise<User[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('users').select('*').order('name')
   return (data ?? []).map(mapUser)
 }
 
 export async function getAssignees(): Promise<User[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('users').select('*').eq('role', 'assignee').order('name')
   return (data ?? []).map(mapUser)
 }
 
 export async function getAllTasks(): Promise<Task[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('tasks').select('*').order('created_at')
   return (data ?? []).map(mapTask)
 }
 
 export async function getTasksForAssignee(userId: string): Promise<Task[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('tasks').select('*').eq('assignee_id', userId).order('created_at')
   return (data ?? []).map(mapTask)
 }
 
 export async function getTaskById(id: string): Promise<Task | null> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle()
   return data ? mapTask(data) : null
 }
 
 export async function getHistoriesForTask(taskId: string): Promise<TaskHistory[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const [{ data }, resolveName] = await Promise.all([
     supabase.from('task_history').select('*').eq('task_id', taskId).order('created_at'),
     buildNameResolver(),
@@ -51,13 +56,13 @@ export async function getHistoriesForTask(taskId: string): Promise<TaskHistory[]
 }
 
 export async function getCommentsForTask(taskId: string): Promise<Comment[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('comments').select('*').eq('task_id', taskId).order('created_at')
   return (data ?? []).map(mapComment)
 }
 
 export async function getTemplates(): Promise<Template[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const [{ data: templates }, { data: items }] = await Promise.all([
     supabase.from('templates').select('*').order('created_at'),
     supabase.from('template_items').select('template_id'),
@@ -70,7 +75,7 @@ export async function getTemplates(): Promise<Template[]> {
 }
 
 export async function getTemplateItems(templateId: string): Promise<string[]> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase
     .from('template_items')
     .select('title')
@@ -80,7 +85,7 @@ export async function getTemplateItems(templateId: string): Promise<string[]> {
 }
 
 export async function getLatestRejectionReasons(): Promise<Record<string, string | null>> {
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data } = await supabase
     .from('task_history')
     .select('task_id, reason, created_at')

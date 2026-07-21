@@ -96,8 +96,9 @@ supabase db reset
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon 키 (RLS 적용) | 클라이언트 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 서비스 롤 키. 크론/스토리지 서명 URL 등 서버 전용 | **서버 전용, 노출 금지** |
 | `NEXT_PUBLIC_SITE_URL` | 배포 절대 URL. 매직 링크 redirect·알림 링크에 사용 | 클라이언트 |
-| `MESSENGER_WEBHOOK_URL` | 메신저 웹훅 URL. 없으면 알림을 콘솔로 출력 | 서버 전용 |
 | `CRON_SECRET` | 크론 엔드포인트 인증 시크릿 | 서버 전용 |
+
+> 메신저 웹훅 URL 은 환경 변수가 아니라 **관리자 보드 화면**에서 입력해 DB(`app_settings`)에 저장한다.
 
 ---
 
@@ -149,7 +150,8 @@ supabase db reset
 - **즉시 발송**: 항목 생성/담당자 배정(담당자에게), `review_requested`(관리자에게), `rejected`(담당자에게, 사유 포함).
 - **일괄 발송(크론, 하루 1회)**: 담당자당 한 건으로 합친 다이제스트(미완료 요약 + 오늘/2일 후 마감 + 마감 초과). 마감 초과는 관리자에게도 통지.
 - 모든 메시지에 항목의 `/tasks/[id]` 절대 경로 링크가 포함된다.
-- `MESSENGER_WEBHOOK_URL` 이 없으면 콘솔 출력으로 대체된다. 웹훅 페이로드는 `{ text: string }` 이며, 스펙이 확정되면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
+- 웹훅 URL 은 **관리자 보드(`/board`) 상단 "알림 웹훅 URL" 필드**에서 입력하며 `app_settings` 테이블에 저장된다(자주 바뀌는 값이라 화면에서 관리). **URL 이 설정되지 않으면 알림을 발송하지 않는다.** 웹훅 페이로드는 `{ text: string }` 이며, 스펙이 확정되면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
+- Teams 웹훅은 채널 → **Workflows** → "Post to a channel when a webhook request is received" 템플릿으로 URL 을 발급받는다(구 Incoming Webhook 커넥터는 폐기됨).
 - 중복 발송은 `notification_log.dedupe_key` 로 차단한다.
 
 ---

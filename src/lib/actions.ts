@@ -2,13 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
+import { writeSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
 import { uploadScreenshot } from '@/lib/storage'
 import { notifyTaskAssigned, notifyReviewRequested, notifyRejected } from '@/lib/notifications'
 
-type ServerClient = ReturnType<typeof createSupabaseServerClient>
+type ServerClient = ReturnType<typeof createSupabaseDbClient>
 
 async function resolveUserName(supabase: ServerClient, userId: string): Promise<string> {
   const { data } = await supabase.from('users').select('name').eq('id', userId).single()
@@ -19,6 +20,7 @@ import {
   statusChangeSchema,
   commentSchema,
   templateUseSchema,
+  webhookUrlSchema,
 } from '@/lib/validation'
 import type { TaskStatus } from '@/types'
 
@@ -41,7 +43,7 @@ export async function changeTaskStatus(input: {
   const parsed = statusChangeSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
     .select('id, title, status, assignee_id')
@@ -89,7 +91,7 @@ export async function requestReviewWithScreenshot(formData: FormData): Promise<A
   const taskId = String(formData.get('taskId') ?? '')
   if (!taskId) return { ok: false, error: '항목 정보가 없습니다.' }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
     .select('id, title, status, assignee_id')
@@ -143,7 +145,7 @@ export async function createTask(input: unknown): Promise<ActionResult> {
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data: created, error } = await supabase
     .from('tasks')
     .insert(toTaskInsert(parsed.data, parsed.data.assigneeId))
@@ -173,7 +175,7 @@ export async function updateTask(taskId: string, input: unknown): Promise<Action
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { error } = await supabase.from('tasks').update(toTaskUpdate(parsed.data)).eq('id', taskId)
   if (error) return { ok: false, error: '항목 수정에 실패했습니다.' }
 
@@ -188,7 +190,7 @@ export async function addComment(input: { taskId: string; body: string }): Promi
   const parsed = commentSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { error } = await supabase.from('comments').insert({
     task_id: parsed.data.taskId,
     author_id: user.id,
@@ -212,7 +214,7 @@ export async function createTasksFromTemplate(input: {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
   if (!parsed.data.baseDate) return { ok: false, error: '기준 마감일을 선택해주세요.' }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = createSupabaseDbClient()
   const { data: items } = await supabase
     .from('template_items')
     .select('*')
@@ -250,5 +252,24 @@ export async function createTasksFromTemplate(input: {
   )
 
   revalidateBoards()
+  return { ok: true }
+}
+
+// 알림 웹훅 URL 은 관리자가 화면에서 입력한다. 빈 문자열이면 값을 비워(콘솔 폴백) 저장한다.
+export async function updateWebhookUrl(url: string): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 웹훅 URL을 변경할 수 있습니다.' }
+
+  const trimmed = url.trim()
+  if (trimmed) {
+    const parsed = webhookUrlSchema.safeParse(trimmed)
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+  }
+
+  const supabase = createSupabaseDbClient()
+  const { ok } = await writeSetting(supabase, WEBHOOK_SETTING_KEY, trimmed || null)
+  if (!ok) return { ok: false, error: '웹훅 URL 저장에 실패했습니다.' }
+
+  revalidatePath('/board')
   return { ok: true }
 }

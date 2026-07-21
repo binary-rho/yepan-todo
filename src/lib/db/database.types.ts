@@ -229,6 +229,24 @@ export interface Database {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          value: string | null
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value?: string | null
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: {

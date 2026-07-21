@@ -1,6 +1,9 @@
 // 메신저 전송부. 웹훅은 단방향 발송만 가능하다고 전제한다.
 // 페이로드는 { text: string } 이 기본이며, 스펙 확정 시 이 파일 한 곳만 고치면 된다.
 
+import { createSupabaseServiceClient } from '@/lib/supabase/service'
+import { readSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
+
 export interface NotificationMessage {
   text: string
 }
@@ -21,14 +24,15 @@ class WebhookTransport implements NotificationTransport {
   }
 }
 
-class ConsoleTransport implements NotificationTransport {
-  async send(message: NotificationMessage): Promise<void> {
-    console.log('[notification]', message.text)
+// 웹훅 URL 은 관리자가 화면에서 입력한 값(app_settings)만 사용한다.
+// 값이 없으면 null 을 반환하고, 알림은 발송하지 않는다.
+export async function getTransport(): Promise<NotificationTransport | null> {
+  let url: string | null = null
+  try {
+    url = await readSetting(createSupabaseServiceClient(), WEBHOOK_SETTING_KEY)
+  } catch {
+    return null
   }
-}
-
-// MESSENGER_WEBHOOK_URL 이 없으면 콘솔 출력으로 대체 동작한다.
-export function getTransport(): NotificationTransport {
-  const url = process.env.MESSENGER_WEBHOOK_URL
-  return url ? new WebhookTransport(url) : new ConsoleTransport()
+  const trimmed = url?.trim()
+  return trimmed ? new WebhookTransport(trimmed) : null
 }

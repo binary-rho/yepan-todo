@@ -9,14 +9,16 @@ import { createTask } from '@/lib/actions'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
+import { WebhookSettingField } from '@/components/WebhookSettingField'
 
 interface BoardViewProps {
   tasks: Task[]
   userList: User[]
   rejectionReasons: Record<string, string | null>
+  webhookUrl: string | null
 }
 
-export function BoardView({ tasks, userList, rejectionReasons }: BoardViewProps) {
+export function BoardView({ tasks, userList, rejectionReasons, webhookUrl }: BoardViewProps) {
   const router = useRouter()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
@@ -66,6 +68,8 @@ export function BoardView({ tasks, userList, rejectionReasons }: BoardViewProps)
           </button>
         </div>
       </div>
+
+      <WebhookSettingField initialUrl={webhookUrl} />
 
       <div className="bg-white border border-zinc-200 rounded p-3 mb-4 flex items-center gap-5">
         <div className="flex-1 min-w-0">

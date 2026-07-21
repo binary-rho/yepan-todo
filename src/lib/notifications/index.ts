@@ -13,7 +13,10 @@ export function taskLink(taskId: string): string {
 // 알림 실패가 사용자 액션 전체를 실패시키지 않도록 감싼다.
 export async function safeSend(text: string): Promise<void> {
   try {
-    await getTransport().send({ text })
+    const transport = await getTransport()
+    // 웹훅 URL 이 설정되지 않았으면 발송하지 않는다.
+    if (!transport) return
+    await transport.send({ text })
   } catch (e) {
     console.error('[notification] 발송 실패', e)
   }

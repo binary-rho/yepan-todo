@@ -58,3 +58,5 @@ export const templateUseSchema = z.object({
 })
 
 export const emailSchema = z.string().trim().email('올바른 이메일 형식이 아닙니다.')
+
+export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
