@@ -25,7 +25,7 @@ DB `task_history.changed_by` 는 uuid 지만 기존 화면은 사람 이름 문�
 정본 타입에는 없지만 `/templates` 화면이 사용한다. DB 컬럼이 아니라 `template_items` 개수에서 매퍼가 계산한다. (HANDOFF_REPORT 4-1 참조)
 
 ### 7. DB 타입은 수동 정의
-`any` 금지 원칙에 따라 `src/lib/db/database.types.ts` 를 스키마와 1:1로 수동 작성했다. 로컬 Supabase 연결 후 `npm run gen:types` 로 자동 생성본으로 교체 가능하다.
+`any` 금지 원칙에 따라 `src/lib/db/database.types.ts` 를 스키마와 1:1로 수동 작성했다. 로컬 Supabase 연결 후 `pnpm gen:types` 로 자동 생성본으로 교체 가능하다.
 
 ## 권한/인증
 

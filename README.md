@@ -28,30 +28,33 @@ FO는 BO에 값이 세팅되어야 동작하는 영역이 많고 항목별 담�
 
 ### 사전 준비
 - Node.js 18.18 이상 (권장: 20+)
+- pnpm 9 이상 (`corepack enable` 또는 `npm i -g pnpm`)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (로컬 DB용, 선택) 또는 Supabase 클라우드 프로젝트
 
 ### 절차
 ```bash
 # 1) 의존성 설치
-npm install
+pnpm install
 
 # 2) 환경 변수 파일 생성
 cp .env.example .env.local
 # .env.local 을 열어 아래 "3. 환경 변수" 값을 채운다.
 
 # 3) 개발 서버 실행
-npm run dev
+pnpm dev
 # http://localhost:3000
 ```
 
 ### 자주 쓰는 스크립트
 ```bash
-npm run dev        # 개발 서버
-npm run build      # 프로덕션 빌드
-npm run start      # 빌드 결과 실행
-npm run typecheck  # 타입 체크 (tsc --noEmit)
-npm run gen:types  # (로컬 Supabase 연결 시) DB 타입 재생성
+pnpm dev        # 개발 서버
+pnpm build      # 프로덕션 빌드
+pnpm start      # 빌드 결과 실행
+pnpm typecheck  # 타입 체크 (tsc --noEmit)
+pnpm gen:types  # (로컬 Supabase 연결 시) DB 타입 재생성
 ```
+
+> 이 프로젝트는 패키지 매니저로 **pnpm** 을 사용한다. Tailwind v4 네이티브 바이너리(`@tailwindcss/oxide`) 빌드를 위해 `package.json` 의 `pnpm.onlyBuiltDependencies` 에 허용 목록을 두었다.
 
 ---
 
