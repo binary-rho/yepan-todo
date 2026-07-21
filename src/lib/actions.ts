@@ -6,6 +6,14 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
 import { uploadScreenshot } from '@/lib/storage'
+import { notifyTaskAssigned, notifyReviewRequested, notifyRejected } from '@/lib/notifications'
+
+type ServerClient = ReturnType<typeof createSupabaseServerClient>
+
+async function resolveUserName(supabase: ServerClient, userId: string): Promise<string> {
+  const { data } = await supabase.from('users').select('name').eq('id', userId).single()
+  return data?.name ?? '담당자'
+}
 import {
   taskInputSchema,
   statusChangeSchema,
@@ -36,19 +44,20 @@ export async function changeTaskStatus(input: {
   const supabase = createSupabaseServerClient()
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, status, assignee_id')
+    .select('id, title, status, assignee_id')
     .eq('id', parsed.data.taskId)
     .maybeSingle()
   if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
 
   const reason = parsed.data.reason?.trim() || null
-  const check = validateTransition(task.status, parsed.data.toStatus as TaskStatus, user.role, reason)
+  const toStatus = parsed.data.toStatus as TaskStatus
+  const check = validateTransition(task.status, toStatus, user.role, reason)
   if (!check.ok) return { ok: false, error: check.reason }
 
   const { error: historyError } = await supabase.from('task_history').insert({
     task_id: task.id,
     from_status: task.status,
-    to_status: parsed.data.toStatus as TaskStatus,
+    to_status: toStatus,
     changed_by: user.id,
     reason,
   })
@@ -56,9 +65,17 @@ export async function changeTaskStatus(input: {
 
   const { error: updateError } = await supabase
     .from('tasks')
-    .update({ status: parsed.data.toStatus as TaskStatus })
+    .update({ status: toStatus })
     .eq('id', task.id)
   if (updateError) return { ok: false, error: '상태 변경에 실패했습니다.' }
+
+  if (toStatus === 'review_requested') {
+    const assigneeName = await resolveUserName(supabase, task.assignee_id)
+    await notifyReviewRequested({ taskId: task.id, title: task.title, assigneeName })
+  } else if (toStatus === 'rejected') {
+    const assigneeName = await resolveUserName(supabase, task.assignee_id)
+    await notifyRejected({ taskId: task.id, title: task.title, assigneeName, reason: reason ?? '' })
+  }
 
   revalidateBoards(task.id)
   return { ok: true }
@@ -75,7 +92,7 @@ export async function requestReviewWithScreenshot(formData: FormData): Promise<A
   const supabase = createSupabaseServerClient()
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, status, assignee_id')
+    .select('id, title, status, assignee_id')
     .eq('id', taskId)
     .maybeSingle()
   if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
@@ -112,6 +129,9 @@ export async function requestReviewWithScreenshot(formData: FormData): Promise<A
     .eq('id', task.id)
   if (updateError) return { ok: false, error: '완료 요청에 실패했습니다.' }
 
+  const assigneeName = await resolveUserName(supabase, task.assignee_id)
+  await notifyReviewRequested({ taskId: task.id, title: task.title, assigneeName })
+
   revalidateBoards(task.id)
   return { ok: true }
 }
@@ -138,6 +158,9 @@ export async function createTask(input: unknown): Promise<ActionResult> {
     changed_by: user.id,
     reason: null,
   })
+
+  const assigneeName = await resolveUserName(supabase, parsed.data.assigneeId)
+  await notifyTaskAssigned({ taskId: created.id, title: parsed.data.title, assigneeName })
 
   revalidateBoards()
   return { ok: true }
