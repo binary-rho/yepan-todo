@@ -1,34 +1,24 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import type { Task, TaskHistory } from '@/types'
 import { getCurrentUser } from '@/lib/auth'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
+import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
 import {
   taskInputSchema,
   statusChangeSchema,
   commentSchema,
   templateUseSchema,
 } from '@/lib/validation'
-import {
-  users,
-  tasks,
-  taskHistories,
-  comments,
-  templateItems,
-} from '@/lib/mock-data'
-
-// TODO(supabase): Server Actions 단계에서 Supabase 쓰기로 교체한다.
-// 반환 타입과 인자 형태는 유지한다.
+import type { TaskStatus } from '@/types'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
-function nowIso(): string {
-  return new Date().toISOString()
-}
-
-function recordHistory(entry: Omit<TaskHistory, 'id' | 'createdAt'>): void {
-  taskHistories.push({ id: crypto.randomUUID(), createdAt: nowIso(), ...entry })
+function revalidateBoards(taskId?: string): void {
+  revalidatePath('/')
+  revalidatePath('/board')
+  if (taskId) revalidatePath(`/tasks/${taskId}`)
 }
 
 export async function changeTaskStatus(input: {
@@ -42,30 +32,34 @@ export async function changeTaskStatus(input: {
   const parsed = statusChangeSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const task = tasks.find((t) => t.id === parsed.data.taskId)
-  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+  const supabase = createSupabaseServerClient()
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, status, assignee_id')
+    .eq('id', parsed.data.taskId)
+    .maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
 
-  if (user.role === 'assignee' && task.assigneeId !== user.id) {
-    return { ok: false, error: '담당자만 이 항목을 변경할 수 있습니다.' }
-  }
-
-  const reason = parsed.data.reason ?? null
-  const check = validateTransition(task.status, parsed.data.toStatus, user.role, reason)
+  const reason = parsed.data.reason?.trim() || null
+  const check = validateTransition(task.status, parsed.data.toStatus as TaskStatus, user.role, reason)
   if (!check.ok) return { ok: false, error: check.reason }
 
-  recordHistory({
-    taskId: task.id,
-    fromStatus: task.status,
-    toStatus: parsed.data.toStatus,
-    changedBy: user.name,
+  const { error: historyError } = await supabase.from('task_history').insert({
+    task_id: task.id,
+    from_status: task.status,
+    to_status: parsed.data.toStatus as TaskStatus,
+    changed_by: user.id,
     reason,
   })
-  task.status = parsed.data.toStatus
-  task.updatedAt = nowIso()
+  if (historyError) return { ok: false, error: '상태 변경 이력 기록에 실패했습니다.' }
 
-  revalidatePath('/')
-  revalidatePath('/board')
-  revalidatePath(`/tasks/${task.id}`)
+  const { error: updateError } = await supabase
+    .from('tasks')
+    .update({ status: parsed.data.toStatus as TaskStatus })
+    .eq('id', task.id)
+  if (updateError) return { ok: false, error: '상태 변경에 실패했습니다.' }
+
+  revalidateBoards(task.id)
   return { ok: true }
 }
 
@@ -76,20 +70,23 @@ export async function createTask(input: unknown): Promise<ActionResult> {
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const id = crypto.randomUUID()
-  const task: Task = {
-    id,
-    ...parsed.data,
-    status: 'todo',
-    screenshotUrl: null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  }
-  tasks.push(task)
-  recordHistory({ taskId: id, fromStatus: null, toStatus: 'todo', changedBy: user.name, reason: null })
+  const supabase = createSupabaseServerClient()
+  const { data: created, error } = await supabase
+    .from('tasks')
+    .insert(toTaskInsert(parsed.data, parsed.data.assigneeId))
+    .select('id')
+    .single()
+  if (error || !created) return { ok: false, error: '항목 생성에 실패했습니다.' }
 
-  revalidatePath('/')
-  revalidatePath('/board')
+  await supabase.from('task_history').insert({
+    task_id: created.id,
+    from_status: null,
+    to_status: 'todo',
+    changed_by: user.id,
+    reason: null,
+  })
+
+  revalidateBoards()
   return { ok: true }
 }
 
@@ -100,14 +97,11 @@ export async function updateTask(taskId: string, input: unknown): Promise<Action
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  const task = tasks.find((t) => t.id === taskId)
-  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+  const supabase = createSupabaseServerClient()
+  const { error } = await supabase.from('tasks').update(toTaskUpdate(parsed.data)).eq('id', taskId)
+  if (error) return { ok: false, error: '항목 수정에 실패했습니다.' }
 
-  Object.assign(task, parsed.data, { updatedAt: nowIso() })
-
-  revalidatePath('/')
-  revalidatePath('/board')
-  revalidatePath(`/tasks/${taskId}`)
+  revalidateBoards(taskId)
   return { ok: true }
 }
 
@@ -118,13 +112,13 @@ export async function addComment(input: { taskId: string; body: string }): Promi
   const parsed = commentSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
-  comments.push({
-    id: crypto.randomUUID(),
-    taskId: parsed.data.taskId,
-    authorId: user.id,
+  const supabase = createSupabaseServerClient()
+  const { error } = await supabase.from('comments').insert({
+    task_id: parsed.data.taskId,
+    author_id: user.id,
     body: parsed.data.body,
-    createdAt: nowIso(),
   })
+  if (error) return { ok: false, error: '코멘트 작성에 실패했습니다.' }
 
   revalidatePath(`/tasks/${parsed.data.taskId}`)
   return { ok: true }
@@ -140,36 +134,45 @@ export async function createTasksFromTemplate(input: {
 
   const parsed = templateUseSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+  if (!parsed.data.baseDate) return { ok: false, error: '기준 마감일을 선택해주세요.' }
 
-  const items = templateItems[parsed.data.templateId] ?? []
-  if (items.length === 0) return { ok: false, error: '템플릿에 항목이 없습니다.' }
+  const supabase = createSupabaseServerClient()
+  const { data: items } = await supabase
+    .from('template_items')
+    .select('*')
+    .eq('template_id', parsed.data.templateId)
+  if (!items || items.length === 0) return { ok: false, error: '템플릿에 항목이 없습니다.' }
 
-  const defaultAssignee = users.find((u) => u.role === 'assignee')
-  if (!defaultAssignee) return { ok: false, error: '담당자가 없습니다.' }
-
-  const dueDate = parsed.data.baseDate
-  for (const title of items) {
-    const id = crypto.randomUUID()
-    tasks.push({
-      id,
-      title,
-      description: null,
-      assigneeId: defaultAssignee.id,
-      status: 'todo',
-      environment: parsed.data.environment as Task['environment'],
-      dueDate,
-      isBlocking: false,
-      confluenceUrl: null,
-      verifyUrl: null,
-      verifyPoint: null,
-      screenshotUrl: null,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    })
-    recordHistory({ taskId: id, fromStatus: null, toStatus: 'todo', changedBy: user.name, reason: null })
+  const missingAssignee = items.some((item) => !item.default_assignee_id)
+  if (missingAssignee) {
+    return { ok: false, error: '담당자가 지정되지 않은 템플릿 항목이 있습니다. 템플릿을 확인해주세요.' }
   }
 
-  revalidatePath('/')
-  revalidatePath('/board')
+  const rows = items.map((item) => ({
+    title: item.title,
+    description: item.description,
+    assignee_id: item.default_assignee_id!,
+    environment: parsed.data.environment as 'dev' | 'stg' | 'prd',
+    due_date: parsed.data.baseDate,
+    is_blocking: item.is_blocking,
+    confluence_url: item.confluence_url,
+    verify_url: item.verify_url,
+    verify_point: item.verify_point,
+  }))
+
+  const { data: created, error } = await supabase.from('tasks').insert(rows).select('id')
+  if (error || !created) return { ok: false, error: '템플릿 생성에 실패했습니다.' }
+
+  await supabase.from('task_history').insert(
+    created.map((t) => ({
+      task_id: t.id,
+      from_status: null,
+      to_status: 'todo' as TaskStatus,
+      changed_by: user.id,
+      reason: null,
+    })),
+  )
+
+  revalidateBoards()
   return { ok: true }
 }

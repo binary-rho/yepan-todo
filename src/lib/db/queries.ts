@@ -1,68 +1,96 @@
 import type { Comment, Task, TaskHistory, Template, User } from '@/types'
-import {
-  users as mockUsers,
-  tasks as mockTasks,
-  taskHistories as mockHistories,
-  comments as mockComments,
-  templates as mockTemplates,
-  templateItems as mockTemplateItems,
-} from '@/lib/mock-data'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate } from '@/lib/db/mappers'
 
-// TODO(supabase): 데이터 연동 단계에서 Supabase 조회로 교체한다.
-// 페이지가 의존하는 함수 시그니처는 유지한다.
+type NameResolver = (userId: string) => string
+
+async function buildNameResolver(): Promise<NameResolver> {
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('users').select('id, name')
+  const map = new Map((data ?? []).map((u) => [u.id, u.name]))
+  return (userId: string) => map.get(userId) ?? '알 수 없음'
+}
 
 export async function getUsers(): Promise<User[]> {
-  return mockUsers
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('users').select('*').order('name')
+  return (data ?? []).map(mapUser)
 }
 
 export async function getAssignees(): Promise<User[]> {
-  return mockUsers.filter((u) => u.role === 'assignee')
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('users').select('*').eq('role', 'assignee').order('name')
+  return (data ?? []).map(mapUser)
 }
 
 export async function getAllTasks(): Promise<Task[]> {
-  return mockTasks
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('tasks').select('*').order('created_at')
+  return (data ?? []).map(mapTask)
 }
 
 export async function getTasksForAssignee(userId: string): Promise<Task[]> {
-  return mockTasks.filter((t) => t.assigneeId === userId)
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('tasks').select('*').eq('assignee_id', userId).order('created_at')
+  return (data ?? []).map(mapTask)
 }
 
 export async function getTaskById(id: string): Promise<Task | null> {
-  return mockTasks.find((t) => t.id === id) ?? null
-}
-
-export async function getAllHistories(): Promise<TaskHistory[]> {
-  return mockHistories
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle()
+  return data ? mapTask(data) : null
 }
 
 export async function getHistoriesForTask(taskId: string): Promise<TaskHistory[]> {
-  return mockHistories.filter((h) => h.taskId === taskId)
+  const supabase = createSupabaseServerClient()
+  const [{ data }, resolveName] = await Promise.all([
+    supabase.from('task_history').select('*').eq('task_id', taskId).order('created_at'),
+    buildNameResolver(),
+  ])
+  return (data ?? []).map((row) => mapTaskHistory(row, resolveName))
 }
 
 export async function getCommentsForTask(taskId: string): Promise<Comment[]> {
-  return mockComments.filter((c) => c.taskId === taskId)
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase.from('comments').select('*').eq('task_id', taskId).order('created_at')
+  return (data ?? []).map(mapComment)
 }
 
 export async function getTemplates(): Promise<Template[]> {
-  return mockTemplates
+  const supabase = createSupabaseServerClient()
+  const [{ data: templates }, { data: items }] = await Promise.all([
+    supabase.from('templates').select('*').order('created_at'),
+    supabase.from('template_items').select('template_id'),
+  ])
+  const countByTemplate = new Map<string, number>()
+  for (const item of items ?? []) {
+    countByTemplate.set(item.template_id, (countByTemplate.get(item.template_id) ?? 0) + 1)
+  }
+  return (templates ?? []).map((t) => mapTemplate(t, countByTemplate.get(t.id) ?? 0))
 }
 
 export async function getTemplateItems(templateId: string): Promise<string[]> {
-  return mockTemplateItems[templateId] ?? []
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase
+    .from('template_items')
+    .select('title')
+    .eq('template_id', templateId)
+    .order('title')
+  return (data ?? []).map((row) => row.title)
 }
 
 export async function getLatestRejectionReasons(): Promise<Record<string, string | null>> {
-  const latestByTask: Record<string, TaskHistory> = {}
-  for (const h of mockHistories) {
-    if (h.toStatus !== 'rejected') continue
-    const prev = latestByTask[h.taskId]
-    if (!prev || h.createdAt.localeCompare(prev.createdAt) > 0) {
-      latestByTask[h.taskId] = h
-    }
-  }
+  const supabase = createSupabaseServerClient()
+  const { data } = await supabase
+    .from('task_history')
+    .select('task_id, reason, created_at')
+    .eq('to_status', 'rejected')
+    .order('created_at', { ascending: true })
+
   const reasons: Record<string, string | null> = {}
-  for (const [taskId, h] of Object.entries(latestByTask)) {
-    reasons[taskId] = h.reason
+  for (const row of data ?? []) {
+    // created_at 오름차순이므로 마지막으로 덮어써진 값이 가장 최근 반려 사유가 된다.
+    reasons[row.task_id] = row.reason
   }
   return reasons
 }
