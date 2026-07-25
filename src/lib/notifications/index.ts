@@ -1,4 +1,4 @@
-import { getTransport } from '@/lib/notifications/transport'
+import { getTransport, type Mention } from '@/lib/notifications/transport'
 
 function getAppBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_SITE_URL
@@ -19,6 +19,32 @@ export async function safeSend(text: string): Promise<void> {
     await transport.send({ text })
   } catch (e) {
     console.error('[notification] 발송 실패', e)
+  }
+}
+
+export type SendResult = { ok: true } | { ok: false; reason: 'no_webhook' | 'failed' }
+
+// 사용자가 버튼으로 직접 호출하는 알림. 결과를 돌려줘 화면에서 성공/실패를 표시한다.
+// mention 이 있으면 Teams 에서 해당 담당자를 @태그한다.
+export async function sendManualCall(p: {
+  taskId: string
+  title: string
+  assigneeName: string
+  mention?: Mention
+}): Promise<SendResult> {
+  const transport = await getTransport()
+  if (!transport) return { ok: false, reason: 'no_webhook' }
+  // 멘션이 있으면 카드가 <at>이름</at> 을 앞에 붙이므로 텍스트에 이름을 넣지 않는다.
+  const namePrefix = p.mention ? '' : `${p.assigneeName} `
+  try {
+    await transport.send({
+      text: `${namePrefix}님, [BO 세팅] '${p.title}' 항목 확인/진행 부탁드립니다.\n${taskLink(p.taskId)}`,
+      mention: p.mention,
+    })
+    return { ok: true }
+  } catch (e) {
+    console.error('[notification] 수동 호출 실패', e)
+    return { ok: false, reason: 'failed' }
   }
 }
 

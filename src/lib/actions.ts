@@ -6,7 +6,7 @@ import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
 import { writeSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
-import { notifyTaskAssigned, notifyRejected } from '@/lib/notifications'
+import { notifyTaskAssigned, notifyRejected, sendManualCall } from '@/lib/notifications'
 import {
   taskInputSchema,
   statusChangeSchema,
@@ -93,6 +93,64 @@ export async function changeTaskStatus(input: {
   }
 
   revalidateBoards(task.id)
+  return { ok: true }
+}
+
+// 대시보드에서 담당자를 바로 변경한다. (상세 진입 없이)
+export async function changeTaskAssignee(taskId: string, assigneeId: string): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
+  if (!assigneeId) return { ok: false, error: '담당자를 선택해주세요.' }
+
+  const supabase = createSupabaseDbClient()
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, project_id')
+    .eq('id', taskId)
+    .maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const writeError = await projectWriteError(supabase, task.project_id)
+  if (writeError) return { ok: false, error: writeError }
+
+  const { data: assignee } = await supabase.from('users').select('id').eq('id', assigneeId).maybeSingle()
+  if (!assignee) return { ok: false, error: '존재하지 않는 담당자입니다.' }
+
+  const { error } = await supabase.from('tasks').update({ assignee_id: assigneeId }).eq('id', taskId)
+  if (error) return { ok: false, error: '담당자 변경에 실패했습니다.' }
+
+  revalidateBoards(taskId)
+  return { ok: true }
+}
+
+// 항목 담당자에게 즉시 알림(호출)을 보낸다. Teams 웹훅이면 담당자를 @태그한다.
+export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
+  const supabase = createSupabaseDbClient()
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, title, assignee_id')
+    .eq('id', taskId)
+    .maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const { data: assignee } = await supabase
+    .from('users')
+    .select('name, email')
+    .eq('id', task.assignee_id)
+    .maybeSingle()
+  if (!assignee) return { ok: false, error: '담당자 정보를 찾을 수 없습니다.' }
+
+  const mention = assignee.email ? { id: assignee.email, name: assignee.name } : undefined
+  const result = await sendManualCall({ taskId: task.id, title: task.title, assigneeName: assignee.name, mention })
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === 'no_webhook'
+          ? '알림 웹훅이 설정되지 않았습니다. 보드 상단에서 URL을 입력해주세요.'
+          : '알림 발송에 실패했습니다.',
+    }
+  }
   return { ok: true }
 }
 

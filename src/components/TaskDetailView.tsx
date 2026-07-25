@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
 import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
-import { changeTaskStatus, addComment, updateTask } from '@/lib/actions'
+import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
@@ -36,6 +36,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [notifyMessage, setNotifyMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const assignee = userList.find(u => u.id === task.assigneeId)!
@@ -67,6 +68,14 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
       }
       setCommentText('')
       router.refresh()
+    })
+  }
+
+  function handleNotify() {
+    setNotifyMessage(null)
+    startTransition(async () => {
+      const result = await notifyTaskNow(task.id)
+      setNotifyMessage(result.ok ? '담당자에게 알림을 보냈습니다.' : result.error)
     })
   }
 
@@ -291,7 +300,17 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
             </div>
           </div>
 
-          <div className="bg-white border border-zinc-200 rounded p-4">
+          <div className="bg-white border border-zinc-200 rounded p-4 space-y-3">
+            <button
+              className="w-full px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 transition-colors tracking-tight disabled:opacity-40"
+              onClick={handleNotify}
+              disabled={isPending}
+            >
+              담당자에게 알림
+            </button>
+            {notifyMessage && (
+              <p className="text-[11px] text-zinc-500 tracking-tight">{notifyMessage}</p>
+            )}
             <button
               className="text-[13px] text-zinc-600 hover:text-zinc-900 tracking-tight transition-colors"
               onClick={() => setShowEdit(true)}

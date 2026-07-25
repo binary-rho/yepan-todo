@@ -6,7 +6,7 @@ import { Plus, FileText, Filter, CalendarRange, MessageSquareText, LayoutDashboa
 import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
-import { createTask, changeTaskStatus } from '@/lib/actions'
+import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
@@ -105,6 +105,12 @@ export function BoardView({
     setDraggingId(null)
     setDragOverStatus(null)
     if (id) moveToStatus(id, status)
+  }
+
+  async function handleAssigneeChange(taskId: string, assigneeId: string) {
+    const result = await changeTaskAssignee(taskId, assigneeId)
+    if (result.ok) router.refresh()
+    return result
   }
 
   function handleProjectChange(projectId: string) {
@@ -276,6 +282,11 @@ export function BoardView({
                         e.dataTransfer.setData('text/plain', task.id)
                       }}
                       onDragEnd={() => { setDraggingId(null); setDragOverStatus(null) }}
+                      assignees={assignees}
+                      readOnly={readOnly}
+                      onMove={status => moveToStatus(task.id, status)}
+                      onAssigneeChange={assigneeId => handleAssigneeChange(task.id, assigneeId)}
+                      onNotify={() => notifyTaskNow(task.id)}
                     />
                   )
                 })}
