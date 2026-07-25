@@ -8,6 +8,7 @@ import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
 import { useCurrentUser } from '@/components/CurrentUserProvider'
+import { CurrentUserPicker } from '@/components/CurrentUserPicker'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
@@ -137,6 +138,7 @@ export function BoardView({
           )}
         </div>
         <div className="flex gap-2 shrink-0">
+          {!readOnly && <CurrentUserPicker />}
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setScheduleModalOpen(true)}
@@ -300,10 +302,7 @@ export function BoardView({
       )}
 
       {newDashboardOpen && (
-        <NewDashboardModal
-          currentProject={currentProject}
-          onClose={() => setNewDashboardOpen(false)}
-        />
+        <NewDashboardModal onClose={() => setNewDashboardOpen(false)} />
       )}
 
       {pendingRejectId && (

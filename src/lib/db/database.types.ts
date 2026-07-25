@@ -13,6 +13,7 @@ export interface Database {
       users: {
         Row: {
           id: string
+          project_id: string
           email: string
           name: string
           team_role: TeamRoleDb | null
@@ -21,6 +22,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          project_id: string
           email: string
           name: string
           team_role?: TeamRoleDb | null
@@ -29,6 +31,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          project_id?: string
           email?: string
           name?: string
           team_role?: TeamRoleDb | null
@@ -224,7 +227,7 @@ export interface Database {
           confluence_url: string | null
           verify_url: string | null
           verify_point: string | null
-          default_assignee_id: string | null
+          default_assignee_name: string | null
         }
         Insert: {
           id?: string
@@ -235,7 +238,7 @@ export interface Database {
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null
-          default_assignee_id?: string | null
+          default_assignee_name?: string | null
         }
         Update: {
           id?: string
@@ -246,7 +249,7 @@ export interface Database {
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null
-          default_assignee_id?: string | null
+          default_assignee_name?: string | null
         }
         Relationships: []
       }

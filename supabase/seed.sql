@@ -1,19 +1,20 @@
 -- 샘플 시드 데이터: 담당자 3명, tasks 5건, 템플릿 1건
 -- 로그인은 없다. users 는 담당자 목록일 뿐이며, 관리자/일반 등급 구분도 없다(모두 동등).
 -- 화면에서 "현재 사용자"로 아무나 선택해 작업할 수 있다.
+-- 멤버는 회차(프로젝트) 하나에만 속한다(회차마다 팀 구성이 다를 수 있어서 전역 공유하지 않는다).
 -- (로컬: `supabase db reset` 시 자동 적용 / 운영: SQL 에디터에서 실행)
-
--- ─── 담당자 ──────────────────────────────────────────────────────────────────
-insert into public.users (id, email, name, messenger_id)
-values
-  ('11111111-1111-1111-1111-111111111111', 'me@example.com', '홍길동', null),
-  ('22222222-2222-2222-2222-222222222222', 'minjun.kim@telecom.co.kr', '김민준', null),
-  ('33333333-3333-3333-3333-333333333333', 'seoyeon.lee@telecom.co.kr', '이서연', null)
-on conflict (id) do nothing;
 
 -- ─── 대시보드(회차) ───────────────────────────────────────────────────────────
 insert into public.projects (id, name, status)
 values ('cccccccc-0000-0000-0000-000000000001', '기본 대시보드', 'active')
+on conflict (id) do nothing;
+
+-- ─── 담당자 (위 대시보드 소속) ─────────────────────────────────────────────────
+insert into public.users (id, project_id, email, name, messenger_id)
+values
+  ('11111111-1111-1111-1111-111111111111', 'cccccccc-0000-0000-0000-000000000001', 'me@example.com', '홍길동', null),
+  ('22222222-2222-2222-2222-222222222222', 'cccccccc-0000-0000-0000-000000000001', 'minjun.kim@telecom.co.kr', '김민준', null),
+  ('33333333-3333-3333-3333-333333333333', 'cccccccc-0000-0000-0000-000000000001', 'seoyeon.lee@telecom.co.kr', '이서연', null)
 on conflict (id) do nothing;
 
 -- ─── Tasks (5건) ──────────────────────────────────────────────────────────────
@@ -53,13 +54,13 @@ insert into public.templates (id, name, description)
 values ('bbbbbbb1-0000-0000-0000-000000000001', '신규 요금제 출시 세팅', '신규 요금제 출시 시 필요한 BO 세팅 항목 묶음입니다.')
 on conflict (id) do nothing;
 
-insert into public.template_items (template_id, title, description, environment, default_assignee_id)
+insert into public.template_items (template_id, title, description, environment, default_assignee_name)
 values
-  ('bbbbbbb1-0000-0000-0000-000000000001', '요금제 노출 순서 설정', null, 'prd', '22222222-2222-2222-2222-222222222222'),
-  ('bbbbbbb1-0000-0000-0000-000000000001', '가입 가능 연령 제한 등록', null, 'prd', '33333333-3333-3333-3333-333333333333'),
-  ('bbbbbbb1-0000-0000-0000-000000000001', '혜택 우선순위 설정', null, 'prd', '22222222-2222-2222-2222-222222222222'),
-  ('bbbbbbb1-0000-0000-0000-000000000001', '요금제 약관 버전 업데이트', null, 'prd', '33333333-3333-3333-3333-333333333333'),
-  ('bbbbbbb1-0000-0000-0000-000000000001', '출시 일시 및 종료일 설정', null, 'prd', '22222222-2222-2222-2222-222222222222')
+  ('bbbbbbb1-0000-0000-0000-000000000001', '요금제 노출 순서 설정', null, 'prd', '김민준'),
+  ('bbbbbbb1-0000-0000-0000-000000000001', '가입 가능 연령 제한 등록', null, 'prd', '이서연'),
+  ('bbbbbbb1-0000-0000-0000-000000000001', '혜택 우선순위 설정', null, 'prd', '김민준'),
+  ('bbbbbbb1-0000-0000-0000-000000000001', '요금제 약관 버전 업데이트', null, 'prd', '이서연'),
+  ('bbbbbbb1-0000-0000-0000-000000000001', '출시 일시 및 종료일 설정', null, 'prd', '김민준')
 on conflict do nothing;
 
 -- ─── 일정 국면 (샘플) ─────────────────────────────────────────────────────────

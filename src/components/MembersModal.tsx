@@ -8,6 +8,7 @@ import { TEAM_ROLES } from '@/lib/constants'
 import { createMember, updateMember, deleteMember, createMembersBulk, importTeamsMembers } from '@/lib/actions'
 
 interface MembersModalProps {
+  projectId: string
   members: User[]
   onClose: () => void
 }
@@ -34,7 +35,7 @@ function TeamRoleSelect({ value, onChange }: { value: TeamRoleOrUnset; onChange:
   )
 }
 
-export function MembersModal({ members, onClose }: MembersModalProps) {
+export function MembersModal({ projectId, members, onClose }: MembersModalProps) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
@@ -75,7 +76,7 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
   function addMember() {
     setError(null)
     startTransition(async () => {
-      const result = await createMember({ name: newName.trim(), email: newEmail.trim(), teamRole: newRole || null })
+      const result = await createMember(projectId, { name: newName.trim(), email: newEmail.trim(), teamRole: newRole || null })
       if (!result.ok) {
         setError(result.error)
         return
@@ -131,7 +132,7 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
     if (toAdd.length === 0) return
     setImportError(null)
     startAddingImported(async () => {
-      const result = await createMembersBulk(toAdd.map(({ name, email }) => ({ name, email })))
+      const result = await createMembersBulk(projectId, toAdd.map(({ name, email }) => ({ name, email })))
       if (!result.ok) {
         setImportError(result.error)
         return
@@ -145,7 +146,10 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
     <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 sticky top-0 bg-white">
-          <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">멤버(담당자) 관리</h2>
+          <div>
+            <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">멤버(담당자) 관리</h2>
+            <p className="text-[11px] text-zinc-400 tracking-tight mt-0.5">지금 보고 있는 회차에만 적용됩니다.</p>
+          </div>
           <button className="text-zinc-400 hover:text-zinc-600" onClick={onClose}><X size={15} /></button>
         </div>
 

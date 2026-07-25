@@ -3,23 +3,20 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
-import type { Project } from '@/types'
 import { startNewDashboard } from '@/lib/actions'
 
 interface NewDashboardModalProps {
-  currentProject: Project
   onClose: () => void
 }
 
-export function NewDashboardModal({ currentProject, onClose }: NewDashboardModalProps) {
+// 활성 대시보드는 항상 하나여야 하므로(그렇지 않으면 어느 회차가 "현재"인지 헷갈린다),
+// 보관 여부를 선택하게 두지 않는다. 새 대시보드를 만들면 기존 활성 대시보드는 무조건 보관된다.
+export function NewDashboardModal({ onClose }: NewDashboardModalProps) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [archiveCurrent, setArchiveCurrent] = useState(currentProject.status === 'active')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
-  const canArchiveCurrent = currentProject.status === 'active'
 
   function create() {
     setError(null)
@@ -27,7 +24,6 @@ export function NewDashboardModal({ currentProject, onClose }: NewDashboardModal
       const result = await startNewDashboard({
         name: name.trim(),
         description: description.trim() || null,
-        archiveCurrentId: canArchiveCurrent && archiveCurrent ? currentProject.id : null,
       })
       if (!result.ok) {
         setError(result.error)
@@ -78,21 +74,8 @@ export function NewDashboardModal({ currentProject, onClose }: NewDashboardModal
             />
           </div>
 
-          {canArchiveCurrent && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-3.5 h-3.5 rounded border-zinc-300 focus:ring-0"
-                checked={archiveCurrent}
-                onChange={e => setArchiveCurrent(e.target.checked)}
-              />
-              <span className="text-[13px] text-zinc-600 tracking-tight">
-                현재 대시보드(<span className="font-medium text-zinc-800">{currentProject.name}</span>)를 보관
-              </span>
-            </label>
-          )}
           <p className="text-[11px] text-zinc-400 tracking-tight">
-            보관된 대시보드는 읽기 전용으로 언제든 다시 열어볼 수 있습니다.
+            만들면 지금 활성 상태인 대시보드는 자동으로 보관되고(읽기 전용, 보관함에서 언제든 다시 열람), 새 대시보드가 활성화됩니다.
           </p>
         </div>
 

@@ -54,6 +54,9 @@ export const templateUseSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, '기준 마감일을 선택해주세요.')
     .nullable()
     .or(z.literal('').transform(() => null)),
+  // 템플릿은 여러 회차에 재사용되므로 담당자는 적용 시점에 그 회차 멤버 중에서 고른다.
+  // key: template_item id, value: 이 회차 멤버(user) id.
+  assigneeByItemId: z.record(z.string(), z.string().min(1, '담당자를 선택해주세요.')),
 })
 
 export const emailSchema = z.string().trim().email('올바른 이메일 형식이 아닙니다.')
@@ -97,7 +100,8 @@ export const templateItemSchema = z.object({
   confluenceUrl: nullableUrl,
   verifyUrl: nullableUrl,
   verifyPoint: nullableText,
-  defaultAssigneeId: z.string().trim().min(1, '항목 담당자를 선택해주세요.'),
+  // 실제 배정이 아니라 자유 텍스트 힌트다(회차마다 멤버가 달라 id로 고정할 수 없음). 실제 담당자는 템플릿 적용 시 고른다.
+  defaultAssigneeName: nullableText,
 })
 
 export const templateInputSchema = z.object({

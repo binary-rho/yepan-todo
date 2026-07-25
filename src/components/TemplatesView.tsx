@@ -8,17 +8,18 @@ import { createTasksFromTemplate, deleteTemplate } from '@/lib/actions'
 import { TemplateUseModal } from '@/components/TemplateUseModal'
 import { TemplateEditorModal } from '@/components/TemplateEditorModal'
 import { useCurrentUser } from '@/components/CurrentUserProvider'
+import { CurrentUserPicker } from '@/components/CurrentUserPicker'
 
 interface TemplatesViewProps {
   templateList: Template[]
   itemsByTemplate: Record<string, TemplateItem[]>
-  userList: User[]
+  members: User[]
   activeProject: { id: string; name: string } | null
 }
 
 type EditorState = { mode: 'create' } | { mode: 'edit'; template: Template }
 
-export function TemplatesView({ templateList, itemsByTemplate, userList, activeProject }: TemplatesViewProps) {
+export function TemplatesView({ templateList, itemsByTemplate, members, activeProject }: TemplatesViewProps) {
   const router = useRouter()
   const { currentUser } = useCurrentUser()
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -26,10 +27,10 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  async function handleConfirm(templateId: string, env: Environment, baseDate: string) {
+  async function handleConfirm(templateId: string, env: Environment, baseDate: string, assigneeByItemId: Record<string, string>) {
     if (!activeProject) return { ok: false as const, error: '활성 대시보드가 없습니다. 보드에서 새 대시보드를 먼저 만들어주세요.' }
     if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
-    const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate }, currentUser.id)
+    const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate, assigneeByItemId }, currentUser.id)
     if (result.ok) {
       setUseModal(null)
       router.refresh()
@@ -56,13 +57,16 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
             </span>
           )}
         </div>
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight"
-          onClick={() => setEditor({ mode: 'create' })}
-        >
-          <Plus size={13} />
-          새 템플릿
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {activeProject && <CurrentUserPicker />}
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight shrink-0 whitespace-nowrap"
+            onClick={() => setEditor({ mode: 'create' })}
+          >
+            <Plus size={13} />
+            새 템플릿
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3 max-w-xl">
@@ -141,8 +145,10 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
       {useModal && (
         <TemplateUseModal
           template={useModal}
+          items={itemsByTemplate[useModal.id] ?? []}
+          members={members}
           onClose={() => setUseModal(null)}
-          onConfirm={(env, baseDate) => handleConfirm(useModal.id, env, baseDate)}
+          onConfirm={(env, baseDate, assigneeByItemId) => handleConfirm(useModal.id, env, baseDate, assigneeByItemId)}
         />
       )}
 
@@ -150,7 +156,6 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
         <TemplateEditorModal
           template={editor.mode === 'edit' ? editor.template : undefined}
           initialItems={editor.mode === 'edit' ? itemsByTemplate[editor.template.id] : undefined}
-          userList={userList}
           onClose={() => setEditor(null)}
           onSaved={() => {
             setEditor(null)

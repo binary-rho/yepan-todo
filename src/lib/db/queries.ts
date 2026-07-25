@@ -22,9 +22,10 @@ async function buildNameResolver(): Promise<NameResolver> {
   return (userId: string) => map.get(userId) ?? '알 수 없음'
 }
 
-export async function getUsers(): Promise<User[]> {
+// 멤버는 회차(프로젝트)마다 따로 관리된다(전역 공유 아님).
+export async function getUsersForProject(projectId: string): Promise<User[]> {
   const supabase = createSupabaseDbClient()
-  const { data } = await supabase.from('users').select('*').order('name')
+  const { data } = await supabase.from('users').select('*').eq('project_id', projectId).order('name')
   return (data ?? []).map(mapUser)
 }
 
@@ -49,6 +50,12 @@ export async function getProjects(): Promise<Project[]> {
     .order('status', { ascending: true }) // active < archived
     .order('created_at', { ascending: false })
   return (data ?? []).map(mapProject)
+}
+
+export async function getProjectById(projectId: string): Promise<Project | null> {
+  const supabase = createSupabaseDbClient()
+  const { data } = await supabase.from('projects').select('*').eq('id', projectId).maybeSingle()
+  return data ? mapProject(data) : null
 }
 
 // 현재 보여줄 회차: 요청된 id 가 있으면 그것, 없으면 가장 최근 활성 회차, 그것도 없으면 가장 최근 회차.

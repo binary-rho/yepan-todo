@@ -5,8 +5,10 @@ export type TeamRole = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
 // 로그인/권한 등급이 없다. 모든 담당자는 동등하며, 화면에서 "현재 사용자"로
 // 선택한 사람이 곧 작업자(changed_by/author_id)가 된다.
+// 멤버는 회차(프로젝트)마다 팀 구성이 다를 수 있어 프로젝트 하나에만 속한다(전역 공유 아님).
 export interface User {
   id: string
+  projectId: string
   email: string
   name: string
   teamRole: TeamRole | null
@@ -83,7 +85,9 @@ export interface TemplateItem {
   confluenceUrl: string | null
   verifyUrl: string | null
   verifyPoint: string | null
-  defaultAssigneeId: string | null
+  // 템플릿은 여러 회차에 걸쳐 재사용되고 멤버는 회차마다 다르므로, 실제 배정이 아니라
+  // "이런 역할/사람이 담당했었다" 정도의 자유 텍스트 힌트다. 실제 담당자는 적용 시점에 고른다.
+  defaultAssigneeName: string | null
 }
 
 export interface SchedulePhase {

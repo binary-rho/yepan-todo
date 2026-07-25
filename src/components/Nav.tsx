@@ -1,11 +1,7 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Users } from 'lucide-react'
-import { MembersModal } from '@/components/MembersModal'
-import { useCurrentUser } from '@/components/CurrentUserProvider'
 
 const NAV_ITEMS = [
   { label: '보드', href: '/' },
@@ -13,10 +9,10 @@ const NAV_ITEMS = [
   { label: '보관함', href: '/archive' },
 ] as const
 
+// "현재 사용자" 선택과 멤버 관리는 회차(프로젝트)에 귀속된 정보라 이 전역 메뉴가 아니라
+// 각 프로젝트 화면(보드 등)의 헤더에 있다. (CurrentUserPicker 참고)
 export function Nav() {
   const pathname = usePathname()
-  const { currentUser, members, selectUser } = useCurrentUser()
-  const [membersOpen, setMembersOpen] = useState(false)
 
   function isActive(href: string): boolean {
     if (href === '/') return pathname === '/'
@@ -44,33 +40,6 @@ export function Nav() {
           </Link>
         ))}
       </nav>
-
-      <div className="px-4 py-3 border-t border-zinc-100 space-y-2">
-        <div>
-          <label className="block text-[11px] text-zinc-400 tracking-tight mb-1">현재 사용자</label>
-          {members.length > 0 ? (
-            <select
-              className="w-full px-2 py-1.5 text-[12px] border border-zinc-200 rounded text-zinc-700 bg-white outline-none focus:border-zinc-400 tracking-tight"
-              value={currentUser?.id ?? ''}
-              onChange={e => selectUser(e.target.value)}
-            >
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          ) : (
-            <p className="text-[12px] text-zinc-400 tracking-tight">멤버를 먼저 추가해주세요.</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setMembersOpen(true)}
-          className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
-        >
-          <Users size={11} />
-          멤버 관리
-        </button>
-      </div>
-
-      {membersOpen && <MembersModal members={members} onClose={() => setMembersOpen(false)} />}
     </aside>
   )
 }

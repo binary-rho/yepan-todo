@@ -137,10 +137,13 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, title, assignee_id')
+    .select('id, title, assignee_id, project_id')
     .eq('id', taskId)
     .maybeSingle()
   if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const writeError = await projectWriteError(supabase, task.project_id)
+  if (writeError) return { ok: false, error: writeError }
 
   const { data: assignee } = await supabase
     .from('users')
@@ -201,6 +204,12 @@ export async function updateTask(taskId: string, input: unknown): Promise<Action
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const { data: task } = await supabase.from('tasks').select('id, project_id').eq('id', taskId).maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const writeError = await projectWriteError(supabase, task.project_id)
+  if (writeError) return { ok: false, error: writeError }
+
   const { error } = await supabase.from('tasks').update(toTaskUpdate(parsed.data)).eq('id', taskId)
   if (error) return { ok: false, error: '항목 수정에 실패했습니다.' }
 
@@ -215,6 +224,12 @@ export async function addComment(input: { taskId: string; body: string }, actorI
   const supabase = createSupabaseDbClient()
   const actor = await requireActor(supabase, actorId)
   if (!actor.ok) return actor
+
+  const { data: task } = await supabase.from('tasks').select('id, project_id').eq('id', parsed.data.taskId).maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const writeError = await projectWriteError(supabase, task.project_id)
+  if (writeError) return { ok: false, error: writeError }
 
   const { error } = await supabase.from('comments').insert({
     task_id: parsed.data.taskId,
@@ -231,6 +246,7 @@ export async function createTasksFromTemplate(projectId: string, input: {
   templateId: string
   environment: string
   baseDate: string
+  assigneeByItemId: Record<string, string>
 }, actorId: string): Promise<ActionResult> {
   const parsed = templateUseSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -249,16 +265,27 @@ export async function createTasksFromTemplate(projectId: string, input: {
     .eq('template_id', parsed.data.templateId)
   if (!items || items.length === 0) return { ok: false, error: '템플릿에 항목이 없습니다.' }
 
-  const missingAssignee = items.some((item) => !item.default_assignee_id)
+  const missingAssignee = items.some((item) => !parsed.data.assigneeByItemId[item.id])
   if (missingAssignee) {
-    return { ok: false, error: '담당자가 지정되지 않은 템플릿 항목이 있습니다. 템플릿을 확인해주세요.' }
+    return { ok: false, error: '담당자가 지정되지 않은 항목이 있습니다.' }
+  }
+
+  // 지정된 담당자가 실제로 이 회차의 멤버인지 검증한다(다른 회차 멤버 id를 실수로 넘기는 것 방지).
+  const assigneeIds = [...new Set(Object.values(parsed.data.assigneeByItemId))]
+  const { data: validAssignees } = await supabase
+    .from('users')
+    .select('id')
+    .eq('project_id', projectId)
+    .in('id', assigneeIds)
+  if (!validAssignees || validAssignees.length !== assigneeIds.length) {
+    return { ok: false, error: '이 회차의 멤버가 아닌 담당자가 포함되어 있습니다.' }
   }
 
   const rows = items.map((item) => ({
     project_id: projectId,
     title: item.title,
     description: item.description,
-    assignee_id: item.default_assignee_id!,
+    assignee_id: parsed.data.assigneeByItemId[item.id],
     environment: parsed.data.environment as 'dev' | 'stg' | 'prd',
     due_date: parsed.data.baseDate,
     confluence_url: item.confluence_url,
@@ -284,18 +311,20 @@ export async function createTasksFromTemplate(projectId: string, input: {
 }
 
 // 담당자(멤버) 추가. 이메일은 Teams @멘션 id(UPN)로도 쓰이므로 실제 조직 이메일을 넣는다.
-export async function createMember(input: unknown): Promise<ActionResult> {
+// 멤버는 회차(프로젝트) 하나에만 속한다(전역 공유 아님).
+export async function createMember(projectId: string, input: unknown): Promise<ActionResult> {
   const parsed = memberInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
   const { error } = await supabase.from('users').insert({
     id: crypto.randomUUID(),
+    project_id: projectId,
     name: parsed.data.name,
     email: parsed.data.email,
     team_role: parsed.data.teamRole ?? null,
   })
-  if (error) return { ok: false, error: '멤버 추가에 실패했습니다.' }
+  if (error) return { ok: false, error: '멤버 추가에 실패했습니다. 이미 이 회차에 등록된 이메일일 수 있습니다.' }
 
   revalidatePath('/')
   revalidatePath('/templates')
@@ -319,19 +348,20 @@ export async function updateMember(memberId: string, input: unknown): Promise<Ac
 }
 
 // 팀즈에서 가져온 멤버를 일괄 등록한다. 역할은 미정(null)으로 시작하며 이후 각자 수정한다.
-// 이메일이 이미 등록돼 있으면 조용히 건너뛴다(unique 제약 위반 방지).
-export async function createMembersBulk(input: unknown): Promise<ActionResult> {
+// 이 회차에 이미 등록된 이메일이면 조용히 건너뛴다(unique 제약 위반 방지).
+export async function createMembersBulk(projectId: string, input: unknown): Promise<ActionResult> {
   const parsed = memberImportListSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
   const rows = parsed.data.map((m) => ({
     id: crypto.randomUUID(),
+    project_id: projectId,
     name: m.name,
     email: m.email,
     team_role: null,
   }))
-  const { error } = await supabase.from('users').upsert(rows, { onConflict: 'email', ignoreDuplicates: true })
+  const { error } = await supabase.from('users').upsert(rows, { onConflict: 'project_id,email', ignoreDuplicates: true })
   if (error) return { ok: false, error: '멤버 일괄 추가에 실패했습니다.' }
 
   revalidatePath('/')
@@ -439,7 +469,7 @@ function toTemplateItemRows(templateId: string, items: TemplateInput['items']) {
     confluence_url: item.confluenceUrl,
     verify_url: item.verifyUrl,
     verify_point: item.verifyPoint,
-    default_assignee_id: item.defaultAssigneeId,
+    default_assignee_name: item.defaultAssigneeName,
   }))
 }
 
@@ -497,12 +527,12 @@ export async function deleteTemplate(templateId: string): Promise<ActionResult> 
   return { ok: true }
 }
 
-// 새 대시보드(회차)를 만든다. archiveCurrentId 가 있으면 그 회차를 보관 처리한 뒤 새 회차를 연다.
+// 새 대시보드(회차)를 만든다. 활성 회차는 항상 하나여야 하므로, 기존에 활성 상태였던
+// 회차는 선택 없이 무조건 보관 처리한 뒤 새 회차를 연다(예외를 두면 활성 회차가 여러 개로 늘어남).
 // 성공 시 새 회차 id 를 함께 돌려줘 클라이언트가 그 대시보드로 이동한다.
 export async function startNewDashboard(input: {
   name: string
   description?: string | null
-  archiveCurrentId?: string | null
 }): Promise<ActionResult & { projectId?: string }> {
   const parsedName = projectNameSchema.safeParse(input.name)
   if (!parsedName.success) return { ok: false, error: parsedName.error.issues[0].message }
@@ -511,13 +541,11 @@ export async function startNewDashboard(input: {
 
   const supabase = createSupabaseDbClient()
 
-  if (input.archiveCurrentId) {
-    const { error: archiveError } = await supabase
-      .from('projects')
-      .update({ status: 'archived', archived_at: new Date().toISOString() })
-      .eq('id', input.archiveCurrentId)
-    if (archiveError) return { ok: false, error: '기존 대시보드 보관에 실패했습니다.' }
-  }
+  const { error: archiveError } = await supabase
+    .from('projects')
+    .update({ status: 'archived', archived_at: new Date().toISOString() })
+    .eq('status', 'active')
+  if (archiveError) return { ok: false, error: '기존 대시보드 보관에 실패했습니다.' }
 
   const { data: created, error } = await supabase
     .from('projects')

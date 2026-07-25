@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
+import { ChevronRight, Link as LinkIcon, ExternalLink, Lock } from 'lucide-react'
 import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
 import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { useCurrentUser } from '@/components/CurrentUserProvider'
+import { CurrentUserPicker } from '@/components/CurrentUserPicker'
 import { StatusBadge, EnvBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
@@ -20,6 +21,7 @@ interface TaskDetailViewProps {
   histories: TaskHistory[]
   screenshotUrl: string | null
   phases: SchedulePhase[]
+  readOnly?: boolean
 }
 
 // 상태 전환 버튼의 라벨/스타일. (반려는 사유 입력 모달을 먼저 띄운다)
@@ -31,7 +33,7 @@ const STATUS_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
   review_requested: { label: '완료요청', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
 }
 
-export function TaskDetailView({ task, userList, comments, histories, screenshotUrl, phases }: TaskDetailViewProps) {
+export function TaskDetailView({ task, userList, comments, histories, screenshotUrl, phases, readOnly }: TaskDetailViewProps) {
   const router = useRouter()
   const { currentUser } = useCurrentUser()
   const [commentText, setCommentText] = useState('')
@@ -100,13 +102,23 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
 
   return (
     <div className="px-6 py-6">
-      <button
-        className="flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-700 mb-4 tracking-tight transition-colors"
-        onClick={() => router.push('/')}
-      >
-        <ChevronRight size={13} className="rotate-180" />
-        목록으로
-      </button>
+      <div className="flex items-center justify-between mb-4">
+        <button
+          className="flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-700 tracking-tight transition-colors"
+          onClick={() => router.push('/')}
+        >
+          <ChevronRight size={13} className="rotate-180" />
+          목록으로
+        </button>
+        {readOnly ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border bg-zinc-100 text-zinc-500 border-zinc-200 tracking-tight">
+            <Lock size={10} />
+            보관됨 (읽기 전용)
+          </span>
+        ) : (
+          <CurrentUserPicker />
+        )}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4 min-w-0">
@@ -193,7 +205,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
             </div>
           )}
 
-          {nextStatuses.length > 0 && (
+          {!readOnly && nextStatuses.length > 0 && (
             <div className="bg-white border border-zinc-200 rounded p-4">
               <p className="text-[12px] font-medium text-zinc-500 tracking-tight mb-3">상태 변경</p>
               <div className="flex gap-2 flex-wrap">
@@ -247,22 +259,24 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
               </div>
             )}
 
-            <div className="flex gap-2">
-              <input
-                className="flex-1 min-w-0 px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()}
-                placeholder="코멘트 입력 후 Enter..."
-              />
-              <button
-                className="px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
-                onClick={submitComment}
-                disabled={!commentText.trim() || isPending}
-              >
-                전송
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 min-w-0 px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()}
+                  placeholder="코멘트 입력 후 Enter..."
+                />
+                <button
+                  className="px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
+                  onClick={submitComment}
+                  disabled={!commentText.trim() || isPending}
+                >
+                  전송
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -306,24 +320,26 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
             </div>
           </div>
 
-          <div className="bg-white border border-zinc-200 rounded p-4 space-y-3">
-            <button
-              className="w-full px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 transition-colors tracking-tight disabled:opacity-40"
-              onClick={handleNotify}
-              disabled={isPending}
-            >
-              담당자에게 알림
-            </button>
-            {notifyMessage && (
-              <p className="text-[11px] text-zinc-500 tracking-tight">{notifyMessage}</p>
-            )}
-            <button
-              className="text-[13px] text-zinc-600 hover:text-zinc-900 tracking-tight transition-colors"
-              onClick={() => setShowEdit(true)}
-            >
-              항목 수정
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="bg-white border border-zinc-200 rounded p-4 space-y-3">
+              <button
+                className="w-full px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 transition-colors tracking-tight disabled:opacity-40"
+                onClick={handleNotify}
+                disabled={isPending}
+              >
+                담당자에게 알림
+              </button>
+              {notifyMessage && (
+                <p className="text-[11px] text-zinc-500 tracking-tight">{notifyMessage}</p>
+              )}
+              <button
+                className="text-[13px] text-zinc-600 hover:text-zinc-900 tracking-tight transition-colors"
+                onClick={() => setShowEdit(true)}
+              >
+                항목 수정
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

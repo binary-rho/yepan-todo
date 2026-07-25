@@ -2,13 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
-import type { Environment, Template, TemplateItem, User } from '@/types'
+import type { Environment, Template, TemplateItem } from '@/types'
 import { createTemplate, updateTemplate } from '@/lib/actions'
 
 interface TemplateEditorModalProps {
   template?: Template
   initialItems?: TemplateItem[]
-  userList: User[]
   onClose: () => void
   onSaved: () => void
 }
@@ -19,11 +18,11 @@ interface ItemRow {
   confluenceUrl: string
   verifyUrl: string
   verifyPoint: string
-  defaultAssigneeId: string
+  defaultAssigneeName: string
 }
 
 function emptyRow(): ItemRow {
-  return { title: '', environment: 'prd', confluenceUrl: '', verifyUrl: '', verifyPoint: '', defaultAssigneeId: '' }
+  return { title: '', environment: 'prd', confluenceUrl: '', verifyUrl: '', verifyPoint: '', defaultAssigneeName: '' }
 }
 
 function toRow(item: TemplateItem): ItemRow {
@@ -33,11 +32,11 @@ function toRow(item: TemplateItem): ItemRow {
     confluenceUrl: item.confluenceUrl ?? '',
     verifyUrl: item.verifyUrl ?? '',
     verifyPoint: item.verifyPoint ?? '',
-    defaultAssigneeId: item.defaultAssigneeId ?? '',
+    defaultAssigneeName: item.defaultAssigneeName ?? '',
   }
 }
 
-export function TemplateEditorModal({ template, initialItems, userList, onClose, onSaved }: TemplateEditorModalProps) {
+export function TemplateEditorModal({ template, initialItems, onClose, onSaved }: TemplateEditorModalProps) {
   const [name, setName] = useState(template?.name ?? '')
   const [description, setDescription] = useState(template?.description ?? '')
   const [rows, setRows] = useState<ItemRow[]>(
@@ -68,7 +67,7 @@ export function TemplateEditorModal({ template, initialItems, userList, onClose,
         confluenceUrl: row.confluenceUrl.trim() || null,
         verifyUrl: row.verifyUrl.trim() || null,
         verifyPoint: row.verifyPoint.trim() || null,
-        defaultAssigneeId: row.defaultAssigneeId,
+        defaultAssigneeName: row.defaultAssigneeName.trim() || null,
       })),
     }
     startTransition(async () => {
@@ -144,14 +143,12 @@ export function TemplateEditorModal({ template, initialItems, userList, onClose,
                   </div>
 
                   <div className="grid grid-cols-[1fr_120px] gap-2 items-center">
-                    <select
-                      className="px-2 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white"
-                      value={row.defaultAssigneeId}
-                      onChange={e => updateRow(index, { defaultAssigneeId: e.target.value })}
-                    >
-                      <option value="">담당자 선택</option>
-                      {userList.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
+                    <input
+                      className="px-2.5 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
+                      value={row.defaultAssigneeName}
+                      onChange={e => updateRow(index, { defaultAssigneeName: e.target.value })}
+                      placeholder="담당자 힌트 (예: FE, 홍길동 — 회차마다 실제 배정은 적용 시 선택)"
+                    />
                     <select
                       className="px-2 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white"
                       value={row.environment}
