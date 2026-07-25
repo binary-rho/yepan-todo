@@ -28,7 +28,6 @@ export const taskInputSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')
     .nullable()
     .or(z.literal('').transform(() => null)),
-  isBlocking: z.boolean(),
   confluenceUrl: nullableUrl,
   verifyUrl: nullableUrl,
   verifyPoint: nullableText,
@@ -89,7 +88,6 @@ export const templateItemSchema = z.object({
   title: z.string().trim().min(1, '항목 제목을 입력해주세요.'),
   description: nullableText,
   environment: environmentSchema.nullable().or(z.literal('').transform(() => null)),
-  isBlocking: z.boolean(),
   confluenceUrl: nullableUrl,
   verifyUrl: nullableUrl,
   verifyPoint: nullableText,

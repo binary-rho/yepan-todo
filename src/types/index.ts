@@ -40,7 +40,6 @@ export interface Task {
   status: TaskStatus
   environment: Environment
   dueDate: string | null
-  isBlocking: boolean
   confluenceUrl: string | null
   verifyUrl: string | null
   verifyPoint: string | null
@@ -80,7 +79,6 @@ export interface TemplateItem {
   title: string
   description: string | null
   environment: Environment | null
-  isBlocking: boolean
   confluenceUrl: string | null
   verifyUrl: string | null
   verifyPoint: string | null

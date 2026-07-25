@@ -11,7 +11,6 @@ export interface TaskFormData {
   assigneeId: string
   environment: Environment
   dueDate: string | null
-  isBlocking: boolean
   confluenceUrl: string | null
   verifyUrl: string | null
   verifyPoint: string | null
@@ -37,7 +36,6 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   const [env, setEnv] = useState<Environment>(task?.environment ?? 'dev')
   const [dueDate, setDueDate] = useState(task?.dueDate ?? '')
   const [selectedPhaseId, setSelectedPhaseId] = useState('')
-  const [blocking, setBlocking] = useState(task?.isBlocking ?? false)
   const [confUrl, setConfUrl] = useState(task?.confluenceUrl ?? '')
   const [verifyUrl, setVerifyUrl] = useState(task?.verifyUrl ?? '')
   const [verifyPoint, setVerifyPoint] = useState(task?.verifyPoint ?? '')
@@ -66,7 +64,6 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
         assigneeId,
         environment: env,
         dueDate: dueDate || null,
-        isBlocking: blocking,
         confluenceUrl: confUrl.trim() || null,
         verifyUrl: verifyUrl.trim() || null,
         verifyPoint: verifyPoint.trim() || null,
@@ -159,27 +156,14 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">마감일</label>
-              <input
-                type="date"
-                className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end pb-1.5">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-3.5 h-3.5 rounded border-zinc-300 focus:ring-0"
-                  checked={blocking}
-                  onChange={e => setBlocking(e.target.checked)}
-                />
-                <span className="text-[13px] text-zinc-600 tracking-tight">차단 항목으로 표시</span>
-              </label>
-            </div>
+          <div>
+            <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">마감일</label>
+            <input
+              type="date"
+              className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+            />
           </div>
 
           <div>

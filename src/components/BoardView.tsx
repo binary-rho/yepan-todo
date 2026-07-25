@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Filter, CalendarRange, MessageSquareText, LayoutDashboard, Lock } from 'lucide-react'
+import { Plus, FileText, Filter, CalendarRange, LayoutDashboard, Lock } from 'lucide-react'
 import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
@@ -42,11 +42,9 @@ export function BoardView({
   const { currentUser } = useCurrentUser()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
-  const [blockingOnly, setBlockingOnly] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [newDashboardOpen, setNewDashboardOpen] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
@@ -59,13 +57,11 @@ export function BoardView({
   const filtered = useMemo(() => tasks.filter(t => {
     if (envFilter !== 'all' && t.environment !== envFilter) return false
     if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter) return false
-    if (blockingOnly && !t.isBlocking) return false
     return true
-  }), [tasks, envFilter, assigneeFilter, blockingOnly])
+  }), [tasks, envFilter, assigneeFilter])
 
   const doneCount = tasks.filter(t => t.status === 'done').length
   const progress = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0
-  const blockingIncomplete = tasks.filter(t => t.isBlocking && t.status !== 'done').length
 
   async function handleCreate(data: TaskFormData) {
     if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
@@ -126,7 +122,8 @@ export function BoardView({
   }
 
   return (
-    <div className="px-6 py-6 flex flex-col h-full">
+    <div className="flex h-full min-h-0">
+      <div className="flex-1 min-w-0 px-6 py-6 flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight shrink-0">보드</h1>
@@ -152,14 +149,6 @@ export function BoardView({
           )}
         </div>
         <div className="flex gap-2">
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
-            onClick={() => setNotesOpen(true)}
-          >
-            <MessageSquareText size={13} />
-            메모
-            {notes.length > 0 && <span className="tabular-nums text-zinc-400">{notes.length}</span>}
-          </button>
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
             onClick={() => setScheduleModalOpen(true)}
@@ -209,9 +198,6 @@ export function BoardView({
         </div>
         <div className="flex items-center gap-4 text-[13px] tabular-nums pl-4 border-l border-zinc-100 shrink-0">
           <span className="text-zinc-500 tracking-tight">전체 <span className="font-medium text-zinc-900">{tasks.length}</span>건</span>
-          {blockingIncomplete > 0 && (
-            <span className="text-red-600 tracking-tight">미완료 차단 <span className="font-medium">{blockingIncomplete}</span>건</span>
-          )}
         </div>
       </div>
 
@@ -235,15 +221,6 @@ export function BoardView({
           <option value="all">전체 담당자</option>
           {assignees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            className="w-3 h-3 rounded border-zinc-300 focus:ring-0"
-            checked={blockingOnly}
-            onChange={e => setBlockingOnly(e.target.checked)}
-          />
-          <span className="text-[12px] text-zinc-600 tracking-tight">차단 항목만</span>
-        </label>
       </div>
 
       {moveError && (
@@ -259,7 +236,7 @@ export function BoardView({
           return (
             <div
               key={status}
-              className="shrink-0 w-60"
+              className="flex-1 min-w-[280px]"
               onDragOver={e => { if (readOnly) return; e.preventDefault(); setDragOverStatus(status) }}
               onDragLeave={e => { if (e.currentTarget === e.target) setDragOverStatus(null) }}
               onDrop={e => handleDrop(status, e)}
@@ -281,7 +258,6 @@ export function BoardView({
                       task={task}
                       assignee={assignee}
                       showAssignee
-                      compact
                       rejectionReason={rejectionReasons[task.id] ?? null}
                       draggable={!readOnly}
                       dragging={draggingId === task.id}
@@ -311,6 +287,9 @@ export function BoardView({
           )
         })}
       </div>
+      </div>
+
+      <ProjectNotesPanel projectId={currentProject.id} notes={notes} readOnly={readOnly} />
 
       {taskModalOpen && (
         <TaskModal
@@ -336,15 +315,6 @@ export function BoardView({
         <NewDashboardModal
           currentProject={currentProject}
           onClose={() => setNewDashboardOpen(false)}
-        />
-      )}
-
-      {notesOpen && (
-        <ProjectNotesPanel
-          projectId={currentProject.id}
-          notes={notes}
-          readOnly={readOnly}
-          onClose={() => setNotesOpen(false)}
         />
       )}
 

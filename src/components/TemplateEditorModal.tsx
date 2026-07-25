@@ -16,7 +16,6 @@ interface TemplateEditorModalProps {
 interface ItemRow {
   title: string
   environment: '' | Environment
-  isBlocking: boolean
   confluenceUrl: string
   verifyUrl: string
   verifyPoint: string
@@ -24,14 +23,13 @@ interface ItemRow {
 }
 
 function emptyRow(): ItemRow {
-  return { title: '', environment: 'prd', isBlocking: false, confluenceUrl: '', verifyUrl: '', verifyPoint: '', defaultAssigneeId: '' }
+  return { title: '', environment: 'prd', confluenceUrl: '', verifyUrl: '', verifyPoint: '', defaultAssigneeId: '' }
 }
 
 function toRow(item: TemplateItem): ItemRow {
   return {
     title: item.title,
     environment: item.environment ?? '',
-    isBlocking: item.isBlocking,
     confluenceUrl: item.confluenceUrl ?? '',
     verifyUrl: item.verifyUrl ?? '',
     verifyPoint: item.verifyPoint ?? '',
@@ -67,7 +65,6 @@ export function TemplateEditorModal({ template, initialItems, userList, onClose,
         title: row.title.trim(),
         description: null,
         environment: row.environment || null,
-        isBlocking: row.isBlocking,
         confluenceUrl: row.confluenceUrl.trim() || null,
         verifyUrl: row.verifyUrl.trim() || null,
         verifyPoint: row.verifyPoint.trim() || null,
@@ -146,7 +143,7 @@ export function TemplateEditorModal({ template, initialItems, userList, onClose,
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-[1fr_100px_auto] gap-2 items-center">
+                  <div className="grid grid-cols-[1fr_120px] gap-2 items-center">
                     <select
                       className="px-2 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white"
                       value={row.defaultAssigneeId}
@@ -165,15 +162,6 @@ export function TemplateEditorModal({ template, initialItems, userList, onClose,
                       <option value="stg">STG</option>
                       <option value="prd">PRD</option>
                     </select>
-                    <label className="flex items-center gap-1.5 cursor-pointer px-1">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 rounded border-zinc-300 focus:ring-0"
-                        checked={row.isBlocking}
-                        onChange={e => updateRow(index, { isBlocking: e.target.checked })}
-                      />
-                      <span className="text-[12px] text-zinc-600 tracking-tight whitespace-nowrap">차단</span>
-                    </label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">

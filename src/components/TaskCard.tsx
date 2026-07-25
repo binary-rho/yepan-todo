@@ -7,14 +7,13 @@ import type { Task, TaskStatus, User } from '@/types'
 import type { ActionResult } from '@/lib/actions'
 import { isOverdue } from '@/lib/date'
 import { allowedNextStatuses } from '@/lib/transitions'
-import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
+import { StatusBadge, EnvBadge } from '@/components/badges'
 import { DueDateDisplay, AssigneeDisplay } from '@/components/displays'
 
 interface TaskCardProps {
   task: Task
   assignee: User
   showAssignee?: boolean
-  compact?: boolean
   rejectionReason?: string | null
   draggable?: boolean
   onDragStart?: (e: DragEvent) => void
@@ -43,7 +42,6 @@ export function TaskCard({
   task,
   assignee,
   showAssignee,
-  compact,
   rejectionReason,
   draggable,
   onDragStart,
@@ -103,7 +101,7 @@ export function TaskCard({
     >
       <div className="cursor-pointer" onClick={() => router.push(`/tasks/${task.id}`)}>
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <p className={`font-medium text-zinc-900 tracking-tight leading-snug flex-1 ${compact ? 'text-[13px]' : 'text-[14px]'}`}>
+          <p className="font-medium text-zinc-900 tracking-tight leading-snug flex-1 text-[14px]">
             {task.title}
           </p>
           <StatusBadge status={task.status} />
@@ -111,7 +109,6 @@ export function TaskCard({
 
         <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
           <EnvBadge env={task.environment} />
-          {task.isBlocking && <BlockingBadge />}
         </div>
 
         <div className="flex items-center justify-between gap-2">

@@ -23,17 +23,17 @@ export function Nav() {
   }
 
   return (
-    <aside className="w-44 shrink-0 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0">
+    <aside className="w-56 shrink-0 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0">
       <div className="px-4 py-4 border-b border-zinc-100">
-        <p className="text-[13px] font-semibold text-zinc-900 tracking-tight">BO 세팅 관리</p>
+        <p className="text-[14px] font-semibold text-zinc-900 tracking-tight">BO 세팅 관리</p>
       </div>
 
-      <nav className="flex-1 px-2 py-2">
+      <nav className="flex-1 px-2.5 py-2.5">
         {NAV_ITEMS.map(item => (
           <Link
             key={item.href}
             href={item.href}
-            className={`block w-full text-left px-3 py-1.5 text-[13px] rounded tracking-tight transition-colors mb-0.5 ${
+            className={`block w-full text-left px-3 py-2 text-[13px] rounded tracking-tight transition-colors mb-0.5 ${
               isActive(item.href)
                 ? 'bg-zinc-100 text-zinc-900 font-medium'
                 : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'

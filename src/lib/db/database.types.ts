@@ -47,7 +47,6 @@ export interface Database {
           status: TaskStatusDb
           environment: EnvironmentDb
           due_date: string | null
-          is_blocking: boolean
           confluence_url: string | null
           verify_url: string | null
           verify_point: string | null
@@ -64,7 +63,6 @@ export interface Database {
           status?: TaskStatusDb
           environment: EnvironmentDb
           due_date?: string | null
-          is_blocking?: boolean
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null
@@ -81,7 +79,6 @@ export interface Database {
           status?: TaskStatusDb
           environment?: EnvironmentDb
           due_date?: string | null
-          is_blocking?: boolean
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null
@@ -221,7 +218,6 @@ export interface Database {
           title: string
           description: string | null
           environment: EnvironmentDb | null
-          is_blocking: boolean
           confluence_url: string | null
           verify_url: string | null
           verify_point: string | null
@@ -233,7 +229,6 @@ export interface Database {
           title: string
           description?: string | null
           environment?: EnvironmentDb | null
-          is_blocking?: boolean
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null
@@ -245,7 +240,6 @@ export interface Database {
           title?: string
           description?: string | null
           environment?: EnvironmentDb | null
-          is_blocking?: boolean
           confluence_url?: string | null
           verify_url?: string | null
           verify_point?: string | null

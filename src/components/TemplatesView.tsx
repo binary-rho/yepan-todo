@@ -128,7 +128,6 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
                       <div key={item.id} className="flex items-start gap-2 py-1.5 border-b border-zinc-50 last:border-0">
                         <span className="text-[11px] text-zinc-400 tabular-nums tracking-tight w-4 shrink-0 mt-0.5">{i + 1}.</span>
                         <span className="text-[13px] text-zinc-700 tracking-tight flex-1">{item.title}</span>
-                        {item.isBlocking && <span className="text-[11px] text-red-500 tracking-tight shrink-0">차단</span>}
                       </div>
                     ))}
                   </div>

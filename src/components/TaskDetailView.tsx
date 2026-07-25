@@ -8,7 +8,7 @@ import { formatDateTime } from '@/lib/date'
 import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { useCurrentUser } from '@/components/CurrentUserProvider'
-import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
+import { StatusBadge, EnvBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
@@ -139,10 +139,6 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
               <div>
                 <p className="text-zinc-400 tracking-tight text-[12px] mb-0.5">마감일</p>
                 <DueDateDisplay dueDate={task.dueDate} />
-              </div>
-              <div>
-                <p className="text-zinc-400 tracking-tight text-[12px] mb-0.5">차단 여부</p>
-                {task.isBlocking ? <BlockingBadge /> : <span className="text-zinc-400">—</span>}
               </div>
             </div>
           </div>
