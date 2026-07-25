@@ -44,7 +44,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   const [notifyMessage, setNotifyMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const assignee = userList.find(u => u.id === task.assigneeId)!
+  const assignee = userList.find(u => u.id === task.assigneeId) ?? null
   const taskComments = comments.filter(c => c.taskId === task.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const taskHistories = histories.filter(h => h.taskId === task.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const latestRejection = taskHistories.filter(h => h.toStatus === 'rejected').slice(-1)[0]?.reason ?? null
@@ -84,11 +84,18 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
     })
   }
 
+  // 담당자가 없으면 부를 사람이 없으므로 태그 없이 채널에만 나간다(담당 지정 요청 성격).
+  const notifyLabel = assignee ? '담당자에게 알림' : '채널에 알림 (담당자 미지정)'
+
   function handleNotify() {
     setNotifyMessage(null)
     startTransition(async () => {
       const result = await notifyTaskNow(task.id)
-      setNotifyMessage(result.ok ? '담당자에게 알림을 보냈습니다.' : result.error)
+      if (!result.ok) {
+        setNotifyMessage(result.error)
+        return
+      }
+      setNotifyMessage(assignee ? '담당자에게 알림을 보냈습니다.' : '사람 태그 없이 채널에 알림을 보냈습니다.')
     })
   }
 
@@ -331,7 +338,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
                 onClick={handleNotify}
                 disabled={isPending}
               >
-                담당자에게 알림
+                {notifyLabel}
               </button>
               {notifyMessage && (
                 <p className="text-[11px] text-zinc-500 tracking-tight">{notifyMessage}</p>

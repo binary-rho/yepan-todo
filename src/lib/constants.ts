@@ -10,11 +10,14 @@ export const STATUS_CONFIG: Record<TaskStatus, { label: string; cls: string }> =
   rejected:         { label: '반려',    cls: 'bg-red-50 text-red-700 border-red-200' },
 }
 
+// 실사용 환경은 STG / PROD 두 개뿐이다(DEV 는 쓰지 않는다).
 export const ENV_CONFIG: Record<Environment, { label: string; cls: string }> = {
-  dev: { label: 'DEV', cls: 'bg-zinc-100 text-zinc-500 border-zinc-200' },
   stg: { label: 'STG', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  prd: { label: 'PRD', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+  prod: { label: 'PROD', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
 }
+
+// 환경 선택 UI 들이 공통으로 쓰는 순서. 환경이 늘거나 줄면 ENV_CONFIG 와 이 배열만 고치면 된다.
+export const ENVIRONMENTS: Environment[] = ['stg', 'prod']
 
 export const KANBAN_COLUMNS: TaskStatus[] = ['todo', 'done', 'rejected']
 

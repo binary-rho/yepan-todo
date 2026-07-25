@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, FileText, ChevronRight } from 'lucide-react'
-import type { Environment, Template, TemplateItem } from '@/types'
+import type { Environment, SchedulePhase, Template, TemplateItem } from '@/types'
 import { createTasksFromTemplate } from '@/lib/actions'
 import { useProjectMember } from '@/components/ProjectMemberProvider'
 import { TemplateUseModal } from '@/components/TemplateUseModal'
@@ -11,13 +11,14 @@ import { TemplateUseModal } from '@/components/TemplateUseModal'
 interface TemplatePickerModalProps {
   templates: Template[]
   itemsByTemplate: Record<string, TemplateItem[]>
+  phases: SchedulePhase[]
   onClose: () => void
   onCreated: () => void
 }
 
 // 보드에서 "템플릿" 을 누르면 템플릿 관리 화면으로 이동하지 않고, 저장된 템플릿 중 하나를 골라
 // 지금 보고 있는 회차에 바로 항목을 만들 수 있게 한다. 고르면 항목별 담당자 지정 단계로 넘어간다.
-export function TemplatePickerModal({ templates, itemsByTemplate, onClose, onCreated }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ templates, itemsByTemplate, phases, onClose, onCreated }: TemplatePickerModalProps) {
   const router = useRouter()
   const { projectId, members, currentUser } = useProjectMember()
   const [selected, setSelected] = useState<Template | null>(null)
@@ -40,6 +41,7 @@ export function TemplatePickerModal({ templates, itemsByTemplate, onClose, onCre
         template={selected}
         items={itemsByTemplate[selected.id] ?? []}
         members={members}
+        phases={phases}
         onClose={() => setSelected(null)}
         onConfirm={applyTemplate}
       />

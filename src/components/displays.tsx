@@ -14,13 +14,27 @@ export function DueDateDisplay({ dueDate }: { dueDate: string | null }) {
   )
 }
 
-export function AssigneeDisplay({ user }: { user: User }) {
+// 담당자는 나중에 정해도 되므로 비어 있을 수 있다. 빈 상태를 공백으로 두면 로딩처럼 보여서
+// "아직 정해지지 않음" 이 드러나게 표시한다.
+export function AssigneeDisplay({ user }: { user: User | null }) {
+  if (!user) return <UnassignedDisplay />
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-zinc-200 text-zinc-600 text-[10px] font-medium tracking-tight shrink-0">
         {initials(user.name)}
       </span>
       <span className="text-[13px] text-zinc-700 tracking-tight">{user.name}</span>
+    </span>
+  )
+}
+
+function UnassignedDisplay() {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded border border-dashed border-zinc-300 text-zinc-400 text-[10px] tracking-tight shrink-0">
+        ?
+      </span>
+      <span className="text-[13px] text-zinc-400 tracking-tight">담당자 미지정</span>
     </span>
   )
 }

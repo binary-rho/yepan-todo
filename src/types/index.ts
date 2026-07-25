@@ -1,5 +1,5 @@
 export type TaskStatus = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
-export type Environment = 'dev' | 'stg' | 'prd'
+export type Environment = 'stg' | 'prod'
 // 담당자 직군 라벨. 미정(null)이 기본값이다.
 export type TeamRole = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
@@ -39,7 +39,8 @@ export interface Task {
   projectId: string
   title: string
   description: string | null
-  assigneeId: string
+  // 담당자가 정해지기 전에도 "이 세팅이 필요하다" 를 먼저 등록할 수 있어 비어 있을 수 있다.
+  assigneeId: string | null
   status: TaskStatus
   environment: Environment
   dueDate: string | null
@@ -88,6 +89,12 @@ export interface TemplateItem {
   // 템플릿은 여러 회차에 걸쳐 재사용되고 멤버는 회차마다 다르므로, 실제 배정이 아니라
   // "이런 역할/사람이 담당했었다" 정도의 자유 텍스트 힌트다. 실제 담당자는 적용 시점에 고른다.
   defaultAssigneeName: string | null
+  // 마감일 규칙. 셋 중 하나로 해석된다(자세한 규칙은 lib/templateDueDate.ts).
+  // 일정 이름이 있으면 그 일정 시작일 ± dueOffsetDays, 없고 dueDate 가 있으면 그 날짜,
+  // 둘 다 없으면 적용 화면의 기준 마감일.
+  duePhaseName: string | null
+  dueOffsetDays: number
+  dueDate: string | null
 }
 
 export interface SchedulePhase {

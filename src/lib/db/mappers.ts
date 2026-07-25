@@ -100,6 +100,9 @@ export function mapTemplateItem(row: TemplateItemRow): TemplateItem {
     verifyUrl: row.verify_url,
     verifyPoint: row.verify_point,
     defaultAssigneeName: row.default_assignee_name,
+    duePhaseName: row.due_phase_name,
+    dueOffsetDays: row.due_offset_days,
+    dueDate: row.due_date,
   }
 }
 
@@ -113,12 +116,12 @@ export function mapSchedulePhase(row: SchedulePhaseRow): SchedulePhase {
   }
 }
 
-export function toTaskInsert(input: TaskInput, assigneeId: string, projectId: string): Database['public']['Tables']['tasks']['Insert'] {
+export function toTaskInsert(input: TaskInput, projectId: string): Database['public']['Tables']['tasks']['Insert'] {
   return {
     project_id: projectId,
     title: input.title,
     description: input.description,
-    assignee_id: assigneeId,
+    assignee_id: input.assigneeId,
     environment: input.environment,
     due_date: input.dueDate,
     confluence_url: input.confluenceUrl,

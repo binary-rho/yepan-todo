@@ -24,6 +24,13 @@ export function isDueSoon(dueDate: string | null): boolean {
   return diff >= 0 && diff <= DUE_SOON_THRESHOLD_DAYS
 }
 
+// yyyy-mm-dd 에 일수를 더한다. 로컬 시간대에 따라 하루씩 밀리지 않도록 UTC 기준으로 계산한다.
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 export function formatDate(s: string): string {
   const d = new Date(s)
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`

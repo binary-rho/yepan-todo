@@ -4,7 +4,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type TaskStatusDb = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
-export type EnvironmentDb = 'dev' | 'stg' | 'prd'
+export type EnvironmentDb = 'stg' | 'prod'
 export type TeamRoleDb = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
 export interface Database {
@@ -46,7 +46,7 @@ export interface Database {
           project_id: string
           title: string
           description: string | null
-          assignee_id: string
+          assignee_id: string | null
           status: TaskStatusDb
           environment: EnvironmentDb
           due_date: string | null
@@ -62,7 +62,7 @@ export interface Database {
           project_id: string
           title: string
           description?: string | null
-          assignee_id: string
+          assignee_id?: string | null
           status?: TaskStatusDb
           environment: EnvironmentDb
           due_date?: string | null
@@ -78,7 +78,7 @@ export interface Database {
           project_id?: string
           title?: string
           description?: string | null
-          assignee_id?: string
+          assignee_id?: string | null
           status?: TaskStatusDb
           environment?: EnvironmentDb
           due_date?: string | null
@@ -228,6 +228,9 @@ export interface Database {
           verify_url: string | null
           verify_point: string | null
           default_assignee_name: string | null
+          due_phase_name: string | null
+          due_offset_days: number
+          due_date: string | null
         }
         Insert: {
           id?: string
@@ -239,6 +242,9 @@ export interface Database {
           verify_url?: string | null
           verify_point?: string | null
           default_assignee_name?: string | null
+          due_phase_name?: string | null
+          due_offset_days?: number
+          due_date?: string | null
         }
         Update: {
           id?: string
@@ -250,6 +256,9 @@ export interface Database {
           verify_url?: string | null
           verify_point?: string | null
           default_assignee_name?: string | null
+          due_phase_name?: string | null
+          due_offset_days?: number
+          due_date?: string | null
         }
         Relationships: []
       }

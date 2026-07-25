@@ -2,12 +2,21 @@
 
 import { useState, useTransition } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
-import type { Environment, Template, TemplateItem } from '@/types'
+import type { Environment, SchedulePhase, Template, TemplateItem } from '@/types'
 import { createTemplate, updateTemplate } from '@/lib/actions'
+import { ENVIRONMENTS, ENV_CONFIG } from '@/lib/constants'
+import {
+  TemplateDueRuleField,
+  emptyDueRuleDraft,
+  fromDueRuleDraft,
+  toDueRuleDraft,
+  type DueRuleDraft,
+} from '@/components/TemplateDueRuleField'
 
 interface TemplateEditorModalProps {
   template?: Template
   initialItems?: TemplateItem[]
+  phases: SchedulePhase[]
   onClose: () => void
   onSaved: () => void
 }
@@ -19,10 +28,19 @@ interface ItemRow {
   verifyUrl: string
   verifyPoint: string
   defaultAssigneeName: string
+  due: DueRuleDraft
 }
 
 function emptyRow(): ItemRow {
-  return { title: '', environment: 'prd', confluenceUrl: '', verifyUrl: '', verifyPoint: '', defaultAssigneeName: '' }
+  return {
+    title: '',
+    environment: 'prod',
+    confluenceUrl: '',
+    verifyUrl: '',
+    verifyPoint: '',
+    defaultAssigneeName: '',
+    due: emptyDueRuleDraft(),
+  }
 }
 
 function toRow(item: TemplateItem): ItemRow {
@@ -33,10 +51,11 @@ function toRow(item: TemplateItem): ItemRow {
     verifyUrl: item.verifyUrl ?? '',
     verifyPoint: item.verifyPoint ?? '',
     defaultAssigneeName: item.defaultAssigneeName ?? '',
+    due: toDueRuleDraft(item),
   }
 }
 
-export function TemplateEditorModal({ template, initialItems, onClose, onSaved }: TemplateEditorModalProps) {
+export function TemplateEditorModal({ template, initialItems, phases, onClose, onSaved }: TemplateEditorModalProps) {
   const [name, setName] = useState(template?.name ?? '')
   const [description, setDescription] = useState(template?.description ?? '')
   const [rows, setRows] = useState<ItemRow[]>(
@@ -68,6 +87,7 @@ export function TemplateEditorModal({ template, initialItems, onClose, onSaved }
         verifyUrl: row.verifyUrl.trim() || null,
         verifyPoint: row.verifyPoint.trim() || null,
         defaultAssigneeName: row.defaultAssigneeName.trim() || null,
+        ...fromDueRuleDraft(row.due),
       })),
     }
     startTransition(async () => {
@@ -155,9 +175,7 @@ export function TemplateEditorModal({ template, initialItems, onClose, onSaved }
                       onChange={e => updateRow(index, { environment: e.target.value as '' | Environment })}
                     >
                       <option value="">환경 없음</option>
-                      <option value="dev">DEV</option>
-                      <option value="stg">STG</option>
-                      <option value="prd">PRD</option>
+                      {ENVIRONMENTS.map(value => <option key={value} value={value}>{ENV_CONFIG[value].label}</option>)}
                     </select>
                   </div>
 
@@ -181,6 +199,14 @@ export function TemplateEditorModal({ template, initialItems, onClose, onSaved }
                     onChange={e => updateRow(index, { verifyPoint: e.target.value })}
                     placeholder="확인 포인트 (선택)"
                   />
+
+                  <div className="pt-1 border-t border-zinc-100">
+                    <TemplateDueRuleField
+                      phases={phases}
+                      value={row.due}
+                      onChange={due => updateRow(index, { due })}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

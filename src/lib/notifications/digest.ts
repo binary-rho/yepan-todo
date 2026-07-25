@@ -48,8 +48,11 @@ export async function runDailyDigest(): Promise<DigestResult> {
   let sent = 0
 
   // ─── 담당자별 다이제스트 (담당자당 한 건) ────────────────────────────────────
+  // 담당자가 없는 항목은 알릴 대상이 없어 여기서 제외한다. 이런 항목은 보드에서 담당자를
+  // 지정하거나 "알림" 버튼으로 채널에 직접 호출한다.
   const byAssignee = new Map<string, typeof incompleteTasks>()
   for (const task of incompleteTasks) {
+    if (!task.assignee_id) continue
     const list = byAssignee.get(task.assignee_id) ?? []
     list.push(task)
     byAssignee.set(task.assignee_id, list)

@@ -12,7 +12,7 @@ import { DueDateDisplay, AssigneeDisplay } from '@/components/displays'
 
 interface TaskCardProps {
   task: Task
-  assignee: User
+  assignee: User | null
   showAssignee?: boolean
   rejectionReason?: string | null
   draggable?: boolean
@@ -68,7 +68,7 @@ export function TaskCard({
   }
 
   function handleAssignee(assigneeId: string) {
-    if (!onAssigneeChange || assigneeId === task.assigneeId) return
+    if (!onAssigneeChange || assigneeId === (task.assigneeId ?? '')) return
     setAssigneeError(null)
     startAssignee(async () => {
       const result = await onAssigneeChange(assigneeId)
@@ -130,10 +130,11 @@ export function TaskCard({
           {onAssigneeChange && assignees ? (
             <select
               className="w-full px-2 py-1 text-[12px] border border-zinc-200 rounded text-zinc-700 bg-white outline-none focus:border-zinc-400 tracking-tight disabled:opacity-50"
-              value={task.assigneeId}
+              value={task.assigneeId ?? ''}
               disabled={assigneePending}
               onChange={e => handleAssignee(e.target.value)}
             >
+              <option value="">담당자 미지정</option>
               {assignees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           ) : (
@@ -159,7 +160,7 @@ export function TaskCard({
                 className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-zinc-200 text-zinc-600 hover:bg-zinc-100 transition-colors tracking-tight disabled:opacity-50"
                 onClick={handleNotify}
                 disabled={notifyState === 'sending'}
-                title="담당자에게 알림 보내기"
+                title={task.assigneeId ? '담당자에게 알림 보내기' : '담당자 지정 요청을 채널에 보내기 (사람 태그 없음)'}
               >
                 {notifyState === 'sent' ? <Check size={11} className="text-emerald-600" /> : notifyState === 'error' ? <AlertCircle size={11} className="text-red-500" /> : <Bell size={11} />}
                 {notifyState === 'sent' ? '전송됨' : notifyState === 'sending' ? '전송중' : '호출'}

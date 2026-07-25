@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, FileText, Filter, CalendarRange, LayoutDashboard, Lock } from 'lucide-react'
 import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, Template, TemplateItem, User } from '@/types'
-import { KANBAN_COLUMNS } from '@/lib/constants'
+import { ENVIRONMENTS, ENV_CONFIG, KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
 import { useProjectMember } from '@/components/ProjectMemberProvider'
@@ -22,6 +22,9 @@ import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 
 // 카드가 눌려서 찌그러지지 않도록 컬럼 폭을 고정한다. 화면이 좁으면(축소가 아니라) 가로 스크롤이 생긴다.
 const COLUMN_WIDTH_CLASS = 'w-72 shrink-0'
+
+// 담당자 필터에서 "아직 담당자가 없는 항목만" 을 고르기 위한 값. 멤버 id(uuid)와 겹치지 않는다.
+const UNASSIGNED_FILTER = 'unassigned'
 
 interface BoardViewProps {
   tasks: Task[]
@@ -65,9 +68,12 @@ export function BoardView({
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (envFilter !== 'all' && t.environment !== envFilter) return false
+    if (assigneeFilter === UNASSIGNED_FILTER) return t.assigneeId === null
     if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter) return false
     return true
   }), [tasks, envFilter, assigneeFilter])
+
+  const unassignedCount = tasks.filter(t => t.assigneeId === null).length
 
   const doneCount = tasks.filter(t => t.status === 'done').length
   const progress = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0
@@ -212,9 +218,7 @@ export function BoardView({
           onChange={e => setEnvFilter(e.target.value as 'all' | Environment)}
         >
           <option value="all">전체 환경</option>
-          <option value="dev">DEV</option>
-          <option value="stg">STG</option>
-          <option value="prd">PRD</option>
+          {ENVIRONMENTS.map(env => <option key={env} value={env}>{ENV_CONFIG[env].label}</option>)}
         </select>
         <select
           className="px-2 py-1 text-[12px] border border-zinc-200 rounded text-zinc-600 bg-white outline-none tracking-tight"
@@ -222,6 +226,7 @@ export function BoardView({
           onChange={e => setAssigneeFilter(e.target.value)}
         >
           <option value="all">전체 담당자</option>
+          <option value={UNASSIGNED_FILTER}>담당자 미지정 ({unassignedCount})</option>
           {assignees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
       </div>
@@ -254,7 +259,7 @@ export function BoardView({
                 }`}
               >
                 {colTasks.map(task => {
-                  const assignee = userList.find(u => u.id === task.assigneeId)!
+                  const assignee = userList.find(u => u.id === task.assigneeId) ?? null
                   return (
                     <TaskCard
                       key={task.id}
@@ -318,6 +323,7 @@ export function BoardView({
         <TemplatePickerModal
           templates={templates}
           itemsByTemplate={itemsByTemplate}
+          phases={phases}
           onClose={() => setTemplatePickerOpen(false)}
           onCreated={() => {
             setTemplatePickerOpen(false)

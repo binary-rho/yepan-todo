@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import { DUE_OFFSET_LIMIT_DAYS } from '@/lib/templateDueDate'
+
+const dateString = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')
+
+const nullableDate = dateString.nullable().or(z.literal('').transform(() => null))
 
 const nullableUrl = z
   .string()
@@ -14,20 +19,16 @@ const nullableText = z
   .nullable()
   .or(z.literal('').transform(() => null))
 
-export const environmentSchema = z.enum(['dev', 'stg', 'prd'])
+export const environmentSchema = z.enum(['stg', 'prod'])
 export const taskStatusSchema = z.enum(['todo', 'in_progress', 'review_requested', 'done', 'rejected'])
 
 export const taskInputSchema = z.object({
   title: z.string().trim().min(1, '제목을 입력해주세요.'),
   description: nullableText,
-  assigneeId: z.string().trim().min(1, '담당자를 선택해주세요.'),
+  // 담당자는 나중에 정해도 된다(미지정으로 먼저 등록 가능).
+  assigneeId: z.string().trim().min(1).nullable().or(z.literal('').transform(() => null)),
   environment: environmentSchema,
-  dueDate: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')
-    .nullable()
-    .or(z.literal('').transform(() => null)),
+  dueDate: nullableDate,
   confluenceUrl: nullableUrl,
   verifyUrl: nullableUrl,
   verifyPoint: nullableText,
@@ -55,8 +56,8 @@ export const templateUseSchema = z.object({
     .nullable()
     .or(z.literal('').transform(() => null)),
   // 템플릿은 여러 회차에 재사용되므로 담당자는 적용 시점에 그 회차 멤버 중에서 고른다.
-  // key: template_item id, value: 이 회차 멤버(user) id.
-  assigneeByItemId: z.record(z.string(), z.string().min(1, '담당자를 선택해주세요.')),
+  // key: template_item id, value: 이 회차 멤버(user) id. 빈 문자열이면 담당자 미지정으로 만든다.
+  assigneeByItemId: z.record(z.string(), z.string()),
 })
 
 export const emailSchema = z.string().trim().email('올바른 이메일 형식이 아닙니다.')
@@ -105,6 +106,14 @@ export const templateItemSchema = z.object({
   verifyPoint: nullableText,
   // 실제 배정이 아니라 자유 텍스트 힌트다(회차마다 멤버가 달라 id로 고정할 수 없음). 실제 담당자는 템플릿 적용 시 고른다.
   defaultAssigneeName: nullableText,
+  // 마감일 규칙. 일정은 회차마다 id 가 새로 발급되므로 이름으로 참조한다.
+  duePhaseName: nullableText,
+  dueOffsetDays: z
+    .number()
+    .int('일수는 정수로 입력해주세요.')
+    .min(-DUE_OFFSET_LIMIT_DAYS, `일수는 ${DUE_OFFSET_LIMIT_DAYS}일 이내로 입력해주세요.`)
+    .max(DUE_OFFSET_LIMIT_DAYS, `일수는 ${DUE_OFFSET_LIMIT_DAYS}일 이내로 입력해주세요.`),
+  dueDate: nullableDate,
 })
 
 export const templateInputSchema = z.object({
@@ -117,12 +126,10 @@ export type TemplateItemInput = z.infer<typeof templateItemSchema>
 
 export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
 
-const dateString = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')
-
 export const schedulePhaseSchema = z.object({
   name: z.string().trim().min(1, '국면 이름을 입력해주세요.'),
   startDate: dateString,
-  endDate: dateString.nullable().or(z.literal('').transform(() => null)),
+  endDate: nullableDate,
 })
 
 export const schedulePhasesSchema = z.array(schedulePhaseSchema)

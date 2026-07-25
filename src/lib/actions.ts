@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
-import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
+import { mapTemplateItem, toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
+import { getSchedulePhases } from '@/lib/db/queries'
+import { resolveTemplateDueDate } from '@/lib/templateDueDate'
 import { writeSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
 import { notifyTaskAssigned, notifyRejected, sendManualCall } from '@/lib/notifications'
 import {
@@ -99,7 +101,7 @@ export async function changeTaskStatus(input: {
   if (updateError) return { ok: false, error: '상태 변경에 실패했습니다.' }
 
   if (toStatus === 'rejected') {
-    const assigneeName = await resolveUserName(supabase, task.assignee_id)
+    const assigneeName = task.assignee_id ? await resolveUserName(supabase, task.assignee_id) : null
     await notifyRejected({ taskId: task.id, title: task.title, assigneeName, reason: reason ?? '' })
   }
 
@@ -108,9 +110,8 @@ export async function changeTaskStatus(input: {
 }
 
 // 대시보드에서 담당자를 바로 변경한다. (상세 진입 없이)
+// 빈 문자열이면 담당자를 비운다("아직 정해지지 않음" 상태로 되돌리기).
 export async function changeTaskAssignee(taskId: string, assigneeId: string): Promise<ActionResult> {
-  if (!assigneeId) return { ok: false, error: '담당자를 선택해주세요.' }
-
   const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
@@ -122,17 +123,20 @@ export async function changeTaskAssignee(taskId: string, assigneeId: string): Pr
   const writeError = await projectWriteError(supabase, task.project_id)
   if (writeError) return { ok: false, error: writeError }
 
-  const { data: assignee } = await supabase.from('users').select('id').eq('id', assigneeId).maybeSingle()
-  if (!assignee) return { ok: false, error: '존재하지 않는 담당자입니다.' }
+  if (assigneeId) {
+    const { data: assignee } = await supabase.from('users').select('id').eq('id', assigneeId).maybeSingle()
+    if (!assignee) return { ok: false, error: '존재하지 않는 담당자입니다.' }
+  }
 
-  const { error } = await supabase.from('tasks').update({ assignee_id: assigneeId }).eq('id', taskId)
+  const { error } = await supabase.from('tasks').update({ assignee_id: assigneeId || null }).eq('id', taskId)
   if (error) return { ok: false, error: '담당자 변경에 실패했습니다.' }
 
   revalidateBoards(taskId)
   return { ok: true }
 }
 
-// 항목 담당자에게 즉시 알림(호출)을 보낸다. Teams 웹훅이면 담당자를 @태그한다.
+// 항목 담당자에게 즉시 알림(호출)을 보낸다. Teams 웹훅이면 담당자를 @태그하고,
+// 담당자가 없는 항목이면 태그 없이 채널에만 보낸다(담당 지정 요청 성격).
 export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
@@ -145,15 +149,17 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
   const writeError = await projectWriteError(supabase, task.project_id)
   if (writeError) return { ok: false, error: writeError }
 
-  const { data: assignee } = await supabase
-    .from('users')
-    .select('name, email')
-    .eq('id', task.assignee_id)
-    .maybeSingle()
-  if (!assignee) return { ok: false, error: '담당자 정보를 찾을 수 없습니다.' }
+  const { data: assignee } = task.assignee_id
+    ? await supabase.from('users').select('name, email').eq('id', task.assignee_id).maybeSingle()
+    : { data: null }
 
-  const mention = assignee.email ? { id: assignee.email, name: assignee.name } : undefined
-  const result = await sendManualCall({ taskId: task.id, title: task.title, assigneeName: assignee.name, mention })
+  const mention = assignee?.email ? { id: assignee.email, name: assignee.name } : undefined
+  const result = await sendManualCall({
+    taskId: task.id,
+    title: task.title,
+    assigneeName: assignee?.name ?? null,
+    mention,
+  })
   if (!result.ok) {
     return {
       ok: false,
@@ -179,7 +185,7 @@ export async function createTask(projectId: string, input: unknown, actorId: str
 
   const { data: created, error } = await supabase
     .from('tasks')
-    .insert(toTaskInsert(parsed.data, parsed.data.assigneeId, projectId))
+    .insert(toTaskInsert(parsed.data, projectId))
     .select('id')
     .single()
   if (error || !created) return { ok: false, error: '항목 생성에 실패했습니다.' }
@@ -192,8 +198,12 @@ export async function createTask(projectId: string, input: unknown, actorId: str
     reason: null,
   })
 
-  const assigneeName = await resolveUserName(supabase, parsed.data.assigneeId)
-  await notifyTaskAssigned({ taskId: created.id, title: parsed.data.title, assigneeName })
+  // 배정 알림은 배정된 사람에게 보내는 것이므로 담당자가 없으면 보내지 않는다.
+  // (담당자가 정해진 뒤 보드/상세의 "알림" 으로 직접 호출한다)
+  if (parsed.data.assigneeId) {
+    const assigneeName = await resolveUserName(supabase, parsed.data.assigneeId)
+    await notifyTaskAssigned({ taskId: created.id, title: parsed.data.title, assigneeName })
+  }
 
   revalidateBoards()
   return { ok: true }
@@ -250,7 +260,6 @@ export async function createTasksFromTemplate(projectId: string, input: {
 }, actorId: string): Promise<ActionResult> {
   const parsed = templateUseSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
-  if (!parsed.data.baseDate) return { ok: false, error: '기준 마감일을 선택해주세요.' }
 
   const supabase = createSupabaseDbClient()
   const actor = await requireActor(supabase, actorId)
@@ -259,38 +268,41 @@ export async function createTasksFromTemplate(projectId: string, input: {
   const writeError = await projectWriteError(supabase, projectId)
   if (writeError) return { ok: false, error: writeError }
 
-  const { data: items } = await supabase
+  const { data: itemRows } = await supabase
     .from('template_items')
     .select('*')
     .eq('template_id', parsed.data.templateId)
-  if (!items || items.length === 0) return { ok: false, error: '템플릿에 항목이 없습니다.' }
-
-  const missingAssignee = items.some((item) => !parsed.data.assigneeByItemId[item.id])
-  if (missingAssignee) {
-    return { ok: false, error: '담당자가 지정되지 않은 항목이 있습니다.' }
-  }
+  if (!itemRows || itemRows.length === 0) return { ok: false, error: '템플릿에 항목이 없습니다.' }
+  const items = itemRows.map(mapTemplateItem)
 
   // 지정된 담당자가 실제로 이 회차의 멤버인지 검증한다(다른 회차 멤버 id를 실수로 넘기는 것 방지).
-  const assigneeIds = [...new Set(Object.values(parsed.data.assigneeByItemId))]
-  const { data: validAssignees } = await supabase
-    .from('users')
-    .select('id')
-    .eq('project_id', projectId)
-    .in('id', assigneeIds)
-  if (!validAssignees || validAssignees.length !== assigneeIds.length) {
-    return { ok: false, error: '이 회차의 멤버가 아닌 담당자가 포함되어 있습니다.' }
+  // 빈 값은 "담당자 미지정" 이므로 검증 대상이 아니다.
+  const assigneeIds = [...new Set(Object.values(parsed.data.assigneeByItemId).filter(Boolean))]
+  if (assigneeIds.length > 0) {
+    const { data: validAssignees } = await supabase
+      .from('users')
+      .select('id')
+      .eq('project_id', projectId)
+      .in('id', assigneeIds)
+    if (!validAssignees || validAssignees.length !== assigneeIds.length) {
+      return { ok: false, error: '이 회차의 멤버가 아닌 담당자가 포함되어 있습니다.' }
+    }
   }
+
+  // 마감일은 항목마다 저장된 규칙(일정 기준 ± N일 / 고정 날짜)으로 계산하고,
+  // 규칙이 없는 항목만 화면에서 입력한 기준 마감일을 쓴다.
+  const phases = await getSchedulePhases()
 
   const rows = items.map((item) => ({
     project_id: projectId,
     title: item.title,
     description: item.description,
-    assignee_id: parsed.data.assigneeByItemId[item.id],
-    environment: parsed.data.environment as 'dev' | 'stg' | 'prd',
-    due_date: parsed.data.baseDate,
-    confluence_url: item.confluence_url,
-    verify_url: item.verify_url,
-    verify_point: item.verify_point,
+    assignee_id: parsed.data.assigneeByItemId[item.id] || null,
+    environment: parsed.data.environment,
+    due_date: resolveTemplateDueDate(item, phases, parsed.data.baseDate),
+    confluence_url: item.confluenceUrl,
+    verify_url: item.verifyUrl,
+    verify_point: item.verifyPoint,
   }))
 
   const { data: created, error } = await supabase.from('tasks').insert(rows).select('id')
@@ -310,6 +322,16 @@ export async function createTasksFromTemplate(projectId: string, input: {
   return { ok: true }
 }
 
+// 멤버 저장 실패 원인을 추측해서 안내하면 엉뚱한 곳을 찾게 된다. 실제로 마이그레이션 미적용으로
+// 컬럼이 없어 실패한 경우에도 "이미 등록된 이메일" 로 안내돼 원인 파악이 늦어진 적이 있다.
+// 중복(unique 위반)만 명확히 구분하고, 나머지는 DB 가 준 메시지를 그대로 덧붙인다.
+const UNIQUE_VIOLATION = '23505'
+
+function memberWriteError(error: { code?: string; message: string }, fallback: string): string {
+  if (error.code === UNIQUE_VIOLATION) return '이미 이 회차에 등록된 이메일입니다.'
+  return `${fallback} (${error.message})`
+}
+
 // 담당자(멤버) 추가. 이메일은 Teams @멘션 id(UPN)로도 쓰이므로 실제 조직 이메일을 넣는다.
 // 멤버는 회차(프로젝트) 하나에만 속한다(전역 공유 아님).
 export async function createMember(projectId: string, input: unknown): Promise<ActionResult> {
@@ -324,7 +346,7 @@ export async function createMember(projectId: string, input: unknown): Promise<A
     email: parsed.data.email,
     team_role: parsed.data.teamRole ?? null,
   })
-  if (error) return { ok: false, error: '멤버 추가에 실패했습니다. 이미 이 회차에 등록된 이메일일 수 있습니다.' }
+  if (error) return { ok: false, error: memberWriteError(error, '멤버 추가에 실패했습니다.') }
 
   revalidatePath('/')
   revalidatePath('/templates')
@@ -340,7 +362,7 @@ export async function updateMember(memberId: string, input: unknown): Promise<Ac
     .from('users')
     .update({ name: parsed.data.name, email: parsed.data.email, team_role: parsed.data.teamRole ?? null })
     .eq('id', memberId)
-  if (error) return { ok: false, error: '멤버 수정에 실패했습니다.' }
+  if (error) return { ok: false, error: memberWriteError(error, '멤버 수정에 실패했습니다.') }
 
   revalidatePath('/')
   revalidatePath('/templates')
@@ -362,7 +384,7 @@ export async function createMembersBulk(projectId: string, input: unknown): Prom
     team_role: null,
   }))
   const { error } = await supabase.from('users').upsert(rows, { onConflict: 'project_id,email', ignoreDuplicates: true })
-  if (error) return { ok: false, error: '멤버 일괄 추가에 실패했습니다.' }
+  if (error) return { ok: false, error: memberWriteError(error, '멤버 일괄 추가에 실패했습니다.') }
 
   revalidatePath('/')
   revalidatePath('/templates')
@@ -470,6 +492,9 @@ function toTemplateItemRows(templateId: string, items: TemplateInput['items']) {
     verify_url: item.verifyUrl,
     verify_point: item.verifyPoint,
     default_assignee_name: item.defaultAssigneeName,
+    due_phase_name: item.duePhaseName,
+    due_offset_days: item.dueOffsetDays,
+    due_date: item.dueDate,
   }))
 }
 

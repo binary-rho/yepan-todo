@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
 import type { Environment, SchedulePhase, Task, User } from '@/types'
 import type { ActionResult } from '@/lib/actions'
+import { ENVIRONMENTS, ENV_CONFIG } from '@/lib/constants'
 
 export interface TaskFormData {
   title: string
   description: string | null
-  assigneeId: string
+  // 담당자는 나중에 정해도 된다("등록 필요" 상태로 먼저 만들기).
+  assigneeId: string | null
   environment: Environment
   dueDate: string | null
   confluenceUrl: string | null
@@ -33,7 +35,7 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   const [title, setTitle] = useState(task?.title ?? '')
   const [desc, setDesc] = useState(task?.description ?? '')
   const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? '')
-  const [env, setEnv] = useState<Environment>(task?.environment ?? 'dev')
+  const [env, setEnv] = useState<Environment>(task?.environment ?? 'stg')
   const [dueDate, setDueDate] = useState(task?.dueDate ?? '')
   const [selectedPhaseId, setSelectedPhaseId] = useState('')
   const [confUrl, setConfUrl] = useState(task?.confluenceUrl ?? '')
@@ -54,14 +56,13 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   function submit() {
     const e: Record<string, string> = {}
     if (!title.trim()) e.title = '제목을 입력해주세요'
-    if (!assigneeId) e.assigneeId = '담당자를 선택해주세요'
     if (Object.keys(e).length) { setErrs(e); return }
     setServerError(null)
     startTransition(async () => {
       const result = await onSubmit({
         title: title.trim(),
         description: desc.trim() || null,
-        assigneeId,
+        assigneeId: assigneeId || null,
         environment: env,
         dueDate: dueDate || null,
         confluenceUrl: confUrl.trim() || null,
@@ -112,18 +113,18 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">
-                담당자 <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">담당자</label>
               <select
-                className={`w-full px-3 py-1.5 border rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white ${errs.assigneeId ? 'border-red-300' : 'border-zinc-200'}`}
+                className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 bg-white"
                 value={assigneeId}
                 onChange={e => setAssigneeId(e.target.value)}
               >
-                <option value="">선택</option>
+                <option value="">담당자 미지정</option>
                 {assignees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
-              {errs.assigneeId && <p className="text-[11px] text-red-500 mt-0.5 tracking-tight">{errs.assigneeId}</p>}
+              {!assigneeId && (
+                <p className="text-[11px] text-zinc-400 mt-0.5 tracking-tight">담당자는 나중에 지정할 수 있습니다.</p>
+              )}
             </div>
             <div>
               <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">
@@ -134,9 +135,7 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
                 value={env}
                 onChange={e => setEnv(e.target.value as Environment)}
               >
-                <option value="dev">DEV</option>
-                <option value="stg">STG</option>
-                <option value="prd">PRD</option>
+                {ENVIRONMENTS.map(value => <option key={value} value={value}>{ENV_CONFIG[value].label}</option>)}
               </select>
             </div>
           </div>
