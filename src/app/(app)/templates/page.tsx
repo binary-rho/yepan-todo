@@ -1,10 +1,14 @@
-import { getTemplates, getTemplateItems, resolveCurrentProject } from '@/lib/db/queries'
+import { getTemplates, getTemplateItems, getUsers, resolveCurrentProject } from '@/lib/db/queries'
 import { TemplatesView } from '@/components/TemplatesView'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TemplatesPage() {
-  const [templates, currentProject] = await Promise.all([getTemplates(), resolveCurrentProject()])
+  const [templates, users, currentProject] = await Promise.all([
+    getTemplates(),
+    getUsers(),
+    resolveCurrentProject(),
+  ])
 
   const entries = await Promise.all(
     templates.map(async (tpl) => [tpl.id, await getTemplateItems(tpl.id)] as const),
@@ -16,5 +20,12 @@ export default async function TemplatesPage() {
       ? { id: currentProject.id, name: currentProject.name }
       : null
 
-  return <TemplatesView templateList={templates} itemsByTemplate={itemsByTemplate} activeProject={activeProject} />
+  return (
+    <TemplatesView
+      templateList={templates}
+      itemsByTemplate={itemsByTemplate}
+      userList={users}
+      activeProject={activeProject}
+    />
+  )
 }

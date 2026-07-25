@@ -76,6 +76,25 @@ export const projectNoteSchema = z.object({
   body: z.string().trim().min(1, '내용을 입력해주세요.'),
 })
 
+export const templateItemSchema = z.object({
+  title: z.string().trim().min(1, '항목 제목을 입력해주세요.'),
+  description: nullableText,
+  environment: environmentSchema.nullable().or(z.literal('').transform(() => null)),
+  isBlocking: z.boolean(),
+  confluenceUrl: nullableUrl,
+  verifyUrl: nullableUrl,
+  verifyPoint: nullableText,
+  defaultAssigneeId: z.string().trim().min(1, '항목 담당자를 선택해주세요.'),
+})
+
+export const templateInputSchema = z.object({
+  name: z.string().trim().min(1, '템플릿 이름을 입력해주세요.').max(40, '이름은 40자 이하로 입력해주세요.'),
+  description: nullableText,
+  items: z.array(templateItemSchema).min(1, '항목을 최소 1개 이상 추가해주세요.'),
+})
+export type TemplateInput = z.infer<typeof templateInputSchema>
+export type TemplateItemInput = z.infer<typeof templateItemSchema>
+
 export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
 
 const dateString = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')

@@ -1,6 +1,6 @@
-import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, TemplateItem, User } from '@/types'
 import { createSupabaseDbClient } from '@/lib/supabase/server'
-import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate, mapSchedulePhase, mapProject, mapProjectNote } from '@/lib/db/mappers'
+import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate, mapTemplateItem, mapSchedulePhase, mapProject, mapProjectNote } from '@/lib/db/mappers'
 import { readSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
 
 export async function getWebhookUrl(): Promise<string | null> {
@@ -117,14 +117,14 @@ export async function getTemplates(): Promise<Template[]> {
   return (templates ?? []).map((t) => mapTemplate(t, countByTemplate.get(t.id) ?? 0))
 }
 
-export async function getTemplateItems(templateId: string): Promise<string[]> {
+export async function getTemplateItems(templateId: string): Promise<TemplateItem[]> {
   const supabase = createSupabaseDbClient()
   const { data } = await supabase
     .from('template_items')
-    .select('title')
+    .select('*')
     .eq('template_id', templateId)
     .order('title')
-  return (data ?? []).map((row) => row.title)
+  return (data ?? []).map(mapTemplateItem)
 }
 
 export async function getLatestRejectionReasons(): Promise<Record<string, string | null>> {

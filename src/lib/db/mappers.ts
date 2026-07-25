@@ -1,4 +1,4 @@
-import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, TemplateItem, User } from '@/types'
 import type { Database } from '@/lib/db/database.types'
 import type { TaskInput } from '@/lib/validation'
 
@@ -7,6 +7,7 @@ type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskHistoryRow = Database['public']['Tables']['task_history']['Row']
 type CommentRow = Database['public']['Tables']['comments']['Row']
 type TemplateRow = Database['public']['Tables']['templates']['Row']
+type TemplateItemRow = Database['public']['Tables']['template_items']['Row']
 type SchedulePhaseRow = Database['public']['Tables']['schedule_phases']['Row']
 type ProjectRow = Database['public']['Tables']['projects']['Row']
 type ProjectNoteRow = Database['public']['Tables']['project_notes']['Row']
@@ -85,6 +86,21 @@ export function mapTemplate(row: TemplateRow, itemCount: number): Template {
     name: row.name,
     description: row.description,
     itemCount,
+  }
+}
+
+export function mapTemplateItem(row: TemplateItemRow): TemplateItem {
+  return {
+    id: row.id,
+    templateId: row.template_id,
+    title: row.title,
+    description: row.description,
+    environment: row.environment,
+    isBlocking: row.is_blocking,
+    confluenceUrl: row.confluence_url,
+    verifyUrl: row.verify_url,
+    verifyPoint: row.verify_point,
+    defaultAssigneeId: row.default_assignee_id,
   }
 }
 

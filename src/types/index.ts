@@ -71,6 +71,19 @@ export interface Template {
   itemCount: number
 }
 
+export interface TemplateItem {
+  id: string
+  templateId: string
+  title: string
+  description: string | null
+  environment: Environment | null
+  isBlocking: boolean
+  confluenceUrl: string | null
+  verifyUrl: string | null
+  verifyPoint: string | null
+  defaultAssigneeId: string | null
+}
+
 export interface SchedulePhase {
   id: string
   name: string

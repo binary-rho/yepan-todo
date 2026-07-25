@@ -12,12 +12,14 @@ import {
   statusChangeSchema,
   commentSchema,
   templateUseSchema,
+  templateInputSchema,
   webhookUrlSchema,
   schedulePhasesSchema,
   profileSchema,
   projectNameSchema,
   projectNoteSchema,
 } from '@/lib/validation'
+import type { TemplateInput } from '@/lib/validation'
 import { PROFILE_USER_ID } from '@/lib/profile'
 import type { TaskStatus } from '@/types'
 
@@ -247,6 +249,81 @@ export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   if (!ok) return { ok: false, error: '웹훅 URL 저장에 실패했습니다.' }
 
   revalidatePath('/')
+  return { ok: true }
+}
+
+// 템플릿 항목(입력) → template_items insert row 변환.
+function toTemplateItemRows(templateId: string, items: TemplateInput['items']) {
+  return items.map((item) => ({
+    template_id: templateId,
+    title: item.title,
+    description: item.description,
+    environment: item.environment,
+    is_blocking: item.isBlocking,
+    confluence_url: item.confluenceUrl,
+    verify_url: item.verifyUrl,
+    verify_point: item.verifyPoint,
+    default_assignee_id: item.defaultAssigneeId,
+  }))
+}
+
+export async function createTemplate(input: unknown): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
+
+  const parsed = templateInputSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const { data: created, error } = await supabase
+    .from('templates')
+    .insert({ name: parsed.data.name, description: parsed.data.description })
+    .select('id')
+    .single()
+  if (error || !created) return { ok: false, error: '템플릿 생성에 실패했습니다.' }
+
+  const { error: itemsError } = await supabase
+    .from('template_items')
+    .insert(toTemplateItemRows(created.id, parsed.data.items))
+  if (itemsError) return { ok: false, error: '템플릿 항목 저장에 실패했습니다.' }
+
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
+// 템플릿 항목은 전체 교체 방식으로 저장한다. (항목 수가 적고 순서/구성 관리가 단순함)
+export async function updateTemplate(templateId: string, input: unknown): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
+
+  const parsed = templateInputSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const { error: updateError } = await supabase
+    .from('templates')
+    .update({ name: parsed.data.name, description: parsed.data.description })
+    .eq('id', templateId)
+  if (updateError) return { ok: false, error: '템플릿 수정에 실패했습니다.' }
+
+  const { error: deleteError } = await supabase.from('template_items').delete().eq('template_id', templateId)
+  if (deleteError) return { ok: false, error: '템플릿 항목 저장에 실패했습니다.' }
+
+  const { error: itemsError } = await supabase
+    .from('template_items')
+    .insert(toTemplateItemRows(templateId, parsed.data.items))
+  if (itemsError) return { ok: false, error: '템플릿 항목 저장에 실패했습니다.' }
+
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
+export async function deleteTemplate(templateId: string): Promise<ActionResult> {
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase.from('templates').delete().eq('id', templateId)
+  if (error) return { ok: false, error: '템플릿 삭제에 실패했습니다.' }
+
+  revalidatePath('/templates')
   return { ok: true }
 }
 
