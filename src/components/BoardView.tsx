@@ -104,7 +104,7 @@ export function BoardView({
     })
   }
 
-  // 카드를 특정 컬럼(상태)으로 이동. 반려로 옮길 때는 사유 입력 모달을 먼저 띄운다.
+  // 카드를 특정 컬럼(상태)으로 이동. 재설정 필요로 옮길 때는 사유 입력 모달을 먼저 띄운다.
   function moveToStatus(taskId: string, toStatus: TaskStatus) {
     if (readOnly) return
     const task = tasks.find(t => t.id === taskId)

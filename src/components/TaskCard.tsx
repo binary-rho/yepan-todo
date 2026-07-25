@@ -31,7 +31,7 @@ interface TaskCardProps {
 const MOVE_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
   todo: { label: '할 일', cls: 'border border-zinc-200 text-zinc-600 hover:bg-zinc-100' },
   done: { label: '완료', cls: 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
-  rejected: { label: '반려', cls: 'border border-red-200 text-red-600 hover:bg-red-50' },
+  rejected: { label: '재설정', cls: 'border border-red-200 text-red-600 hover:bg-red-50' },
   in_progress: { label: '진행중', cls: 'border border-zinc-200 text-zinc-600 hover:bg-zinc-100' },
   review_requested: { label: '완료요청', cls: 'border border-zinc-200 text-zinc-600 hover:bg-zinc-100' },
 }
@@ -120,7 +120,7 @@ export function TaskCard({
       {task.status === 'rejected' && rejectionReason && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
           <p className="text-[12px] text-red-700 tracking-tight">
-            <span className="font-medium">반려 사유: </span>{rejectionReason}
+            <span className="font-medium">재설정 사유: </span>{rejectionReason}
           </p>
         </div>
       )}

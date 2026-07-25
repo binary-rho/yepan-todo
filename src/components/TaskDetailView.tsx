@@ -25,11 +25,11 @@ interface TaskDetailViewProps {
   readOnly?: boolean
 }
 
-// 상태 전환 버튼의 라벨/스타일. (반려는 사유 입력 모달을 먼저 띄운다)
+// 상태 전환 버튼의 라벨/스타일. (재설정 요청은 사유 입력 모달을 먼저 띄운다)
 const STATUS_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
   todo: { label: '할 일로 이동', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
   done: { label: '완료 처리', cls: 'bg-emerald-600 text-white hover:bg-emerald-700' },
-  rejected: { label: '반려', cls: 'border border-red-200 text-red-600 hover:bg-red-50' },
+  rejected: { label: '재설정 요청', cls: 'border border-red-200 text-red-600 hover:bg-red-50' },
   in_progress: { label: '진행중', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
   review_requested: { label: '완료요청', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
 }
@@ -141,7 +141,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
 
             {task.status === 'rejected' && latestRejection && (
               <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded">
-                <p className="text-[12px] font-medium text-red-700 tracking-tight mb-0.5">반려 사유</p>
+                <p className="text-[12px] font-medium text-red-700 tracking-tight mb-0.5">재설정 사유</p>
                 <p className="text-[13px] text-red-800 tracking-tight">{latestRejection}</p>
               </div>
             )}

@@ -170,7 +170,7 @@ export async function getLatestRejectionReasons(): Promise<Record<string, string
 
   const reasons: Record<string, string | null> = {}
   for (const row of data ?? []) {
-    // created_at 오름차순이므로 마지막으로 덮어써진 값이 가장 최근 반려 사유가 된다.
+    // created_at 오름차순이므로 마지막으로 덮어써진 값이 가장 최근 재설정 사유가 된다.
     reasons[row.task_id] = row.reason
   }
   return reasons

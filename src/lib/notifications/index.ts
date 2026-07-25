@@ -73,6 +73,6 @@ export async function notifyReviewRequested(p: { taskId: string; title: string; 
 export async function notifyRejected(p: { taskId: string; title: string; assigneeName: string | null; reason: string }): Promise<void> {
   const greeting = p.assigneeName ? `${p.assigneeName}님, ` : ''
   await safeSend(
-    `[BO 세팅] ${greeting}항목이 반려되었습니다.\n- ${p.title}\n- 사유: ${p.reason}\n${taskLink(p.taskId)}`,
+    `[BO 세팅] ${greeting}다시 설정이 필요한 항목이 있습니다.\n- ${p.title}\n- 사유: ${p.reason}\n${taskLink(p.taskId)}`,
   )
 }
