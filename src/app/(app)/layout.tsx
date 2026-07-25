@@ -1,14 +1,16 @@
-import { requireUser } from '@/lib/auth'
 import { getUsers } from '@/lib/db/queries'
 import { Nav } from '@/components/Nav'
+import { CurrentUserProvider } from '@/components/CurrentUserProvider'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, members] = await Promise.all([requireUser(), getUsers()])
+  const members = await getUsers()
 
   return (
-    <div className="flex min-h-screen bg-background font-[Pretendard,system-ui,sans-serif]">
-      <Nav currentUser={user} members={members} />
-      <main className="flex-1 overflow-auto min-w-0">{children}</main>
-    </div>
+    <CurrentUserProvider members={members}>
+      <div className="flex min-h-screen bg-background font-[Pretendard,system-ui,sans-serif]">
+        <Nav />
+        <main className="flex-1 overflow-auto min-w-0">{children}</main>
+      </div>
+    </CurrentUserProvider>
   )
 }

@@ -28,12 +28,6 @@ export async function getUsers(): Promise<User[]> {
   return (data ?? []).map(mapUser)
 }
 
-export async function getAssignees(): Promise<User[]> {
-  const supabase = createSupabaseDbClient()
-  const { data } = await supabase.from('users').select('*').eq('role', 'assignee').order('name')
-  return (data ?? []).map(mapUser)
-}
-
 export async function getAllTasks(): Promise<Task[]> {
   const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('tasks').select('*').order('created_at')

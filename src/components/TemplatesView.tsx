@@ -7,6 +7,7 @@ import type { Environment, Template, TemplateItem, User } from '@/types'
 import { createTasksFromTemplate, deleteTemplate } from '@/lib/actions'
 import { TemplateUseModal } from '@/components/TemplateUseModal'
 import { TemplateEditorModal } from '@/components/TemplateEditorModal'
+import { useCurrentUser } from '@/components/CurrentUserProvider'
 
 interface TemplatesViewProps {
   templateList: Template[]
@@ -19,6 +20,7 @@ type EditorState = { mode: 'create' } | { mode: 'edit'; template: Template }
 
 export function TemplatesView({ templateList, itemsByTemplate, userList, activeProject }: TemplatesViewProps) {
   const router = useRouter()
+  const { currentUser } = useCurrentUser()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [useModal, setUseModal] = useState<Template | null>(null)
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -26,7 +28,8 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
 
   async function handleConfirm(templateId: string, env: Environment, baseDate: string) {
     if (!activeProject) return { ok: false as const, error: '활성 대시보드가 없습니다. 보드에서 새 대시보드를 먼저 만들어주세요.' }
-    const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate })
+    if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
+    const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate }, currentUser.id)
     if (result.ok) {
       setUseModal(null)
       router.refresh()
@@ -108,8 +111,8 @@ export function TemplatesView({ templateList, itemsByTemplate, userList, activeP
                     <button
                       className="px-3 py-1.5 text-[12px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
                       onClick={() => setUseModal(tpl)}
-                      disabled={!activeProject || items.length === 0}
-                      title={!activeProject ? '활성 대시보드가 없습니다' : undefined}
+                      disabled={!activeProject || items.length === 0 || !currentUser}
+                      title={!activeProject ? '활성 대시보드가 없습니다' : !currentUser ? '작업할 사용자를 먼저 선택해주세요' : undefined}
                     >
                       이 템플릿으로 생성
                     </button>

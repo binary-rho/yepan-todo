@@ -13,7 +13,7 @@ type ProjectRow = Database['public']['Tables']['projects']['Row']
 type ProjectNoteRow = Database['public']['Tables']['project_notes']['Row']
 
 export function mapUser(row: UserRow): User {
-  return { id: row.id, email: row.email, name: row.name, role: row.role, teamRole: row.team_role }
+  return { id: row.id, email: row.email, name: row.name, teamRole: row.team_role }
 }
 
 export function mapProject(row: ProjectRow): Project {

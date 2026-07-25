@@ -7,6 +7,7 @@ import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
+import { useCurrentUser } from '@/components/CurrentUserProvider'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
@@ -38,6 +39,7 @@ export function BoardView({
   notes,
 }: BoardViewProps) {
   const router = useRouter()
+  const { currentUser } = useCurrentUser()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
   const [blockingOnly, setBlockingOnly] = useState(false)
@@ -66,7 +68,8 @@ export function BoardView({
   const blockingIncomplete = tasks.filter(t => t.isBlocking && t.status !== 'done').length
 
   async function handleCreate(data: TaskFormData) {
-    const result = await createTask(currentProject.id, data)
+    if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
+    const result = await createTask(currentProject.id, data, currentUser.id)
     if (result.ok) {
       setTaskModalOpen(false)
       router.refresh()
@@ -75,9 +78,13 @@ export function BoardView({
   }
 
   function runMove(taskId: string, toStatus: TaskStatus, reason?: string) {
+    if (!currentUser) {
+      setMoveError('작업할 사용자를 먼저 선택해주세요.')
+      return
+    }
     setMoveError(null)
     startTransition(async () => {
-      const result = await changeTaskStatus({ taskId, toStatus, reason: reason ?? null })
+      const result = await changeTaskStatus({ taskId, toStatus, reason: reason ?? null }, currentUser.id)
       if (!result.ok) {
         setMoveError(result.error)
         return
@@ -176,8 +183,10 @@ export function BoardView({
           </button>
           {!readOnly && (
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
               onClick={() => setTaskModalOpen(true)}
+              disabled={!currentUser}
+              title={!currentUser ? '작업할 사용자를 먼저 선택해주세요' : undefined}
             >
               <Plus size={13} />
               새 항목

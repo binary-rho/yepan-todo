@@ -28,7 +28,7 @@ export async function runDailyDigest(): Promise<DigestResult> {
   const supabase = createSupabaseServiceClient()
 
   // 무료 플랜 일시정지 방지용 가벼운 쿼리 겸 사용자 로딩.
-  const { data: users } = await supabase.from('users').select('id, name, role')
+  const { data: users } = await supabase.from('users').select('id, name')
   const { data: tasks } = await supabase
     .from('tasks')
     .select('id, title, status, assignee_id, due_date')
@@ -44,7 +44,6 @@ export async function runDailyDigest(): Promise<DigestResult> {
   const plus2Str = dateStr(plus2)
 
   const nameById = new Map(userList.map((u) => [u.id, u.name]))
-  const admins = userList.filter((u) => u.role === 'admin')
 
   let sent = 0
 
@@ -81,25 +80,6 @@ export async function runDailyDigest(): Promise<DigestResult> {
 
     await safeSend(lines.join('\n'))
     sent += 1
-  }
-
-  // ─── 마감 초과 항목은 관리자에게도 함께 알린다 ───────────────────────────────
-  const allOverdue = incompleteTasks.filter((t) => t.due_date && t.due_date < todayStr)
-  if (allOverdue.length > 0 && admins.length > 0) {
-    const dedupeKey = `overdue_admin:${todayStr}`
-    const reserved = await reserve(supabase, {
-      dedupeKey,
-      kind: 'overdue_admin',
-      userId: admins[0].id,
-    })
-    if (reserved) {
-      const lines: string[] = [`[BO 세팅] 마감 초과 항목이 ${allOverdue.length}건 있습니다.`]
-      for (const t of allOverdue) {
-        lines.push(`- ${t.title} (담당: ${nameById.get(t.assignee_id) ?? '미상'})\n  ${taskLink(t.id)}`)
-      }
-      await safeSend(lines.join('\n'))
-      sent += 1
-    }
   }
 
   return { sent }

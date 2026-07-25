@@ -59,12 +59,6 @@ export const templateUseSchema = z.object({
 
 export const emailSchema = z.string().trim().email('올바른 이메일 형식이 아닙니다.')
 
-export const profileSchema = z.object({
-  name: z.string().trim().min(1, '이름을 입력해주세요.').max(30, '이름은 30자 이하로 입력해주세요.'),
-  email: emailSchema,
-})
-export type ProfileInput = z.infer<typeof profileSchema>
-
 export const teamRoleSchema = z.enum(['사업', '기획', 'TPM', 'FE', 'BE'])
 
 export const memberInputSchema = z.object({

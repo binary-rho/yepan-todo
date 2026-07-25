@@ -6,7 +6,6 @@ import { X, Plus, Trash2, Pencil, Check, DownloadCloud } from 'lucide-react'
 import type { TeamRole, User } from '@/types'
 import { TEAM_ROLES } from '@/lib/constants'
 import { createMember, updateMember, deleteMember, createMembersBulk, importTeamsMembers } from '@/lib/actions'
-import { PROFILE_USER_ID } from '@/lib/profile'
 
 interface MembersModalProps {
   members: User[]
@@ -222,7 +221,6 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
 
           <div className="space-y-1.5">
             {members.map(member => {
-              const isOperator = member.id === PROFILE_USER_ID
               const isEditing = editingId === member.id
               if (isEditing) {
                 return (
@@ -257,7 +255,6 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-[13px] font-medium text-zinc-900 tracking-tight">{member.name}</span>
                       <span className="text-[11px] text-zinc-400 tracking-tight">{member.teamRole ?? '미정'}</span>
-                      {isOperator && <span className="text-[10px] text-zinc-400 tracking-tight">(나)</span>}
                     </div>
                     <p className="text-[12px] text-zinc-500 tracking-tight truncate">{member.email}</p>
                   </div>
@@ -268,16 +265,14 @@ export function MembersModal({ members, onClose }: MembersModalProps) {
                   >
                     <Pencil size={13} />
                   </button>
-                  {!isOperator && (
-                    <button
-                      className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors shrink-0"
-                      onClick={() => remove(member)}
-                      disabled={isPending}
-                      aria-label="삭제"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
+                  <button
+                    className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors shrink-0"
+                    onClick={() => remove(member)}
+                    disabled={isPending}
+                    aria-label="삭제"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               )
             })}

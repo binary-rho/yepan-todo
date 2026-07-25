@@ -3,20 +3,18 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Pencil, Users } from 'lucide-react'
-import type { User } from '@/types'
-import { initials } from '@/lib/date'
-import { ProfileModal } from '@/components/ProfileModal'
+import { Users } from 'lucide-react'
 import { MembersModal } from '@/components/MembersModal'
+import { useCurrentUser } from '@/components/CurrentUserProvider'
 
 const NAV_ITEMS = [
   { label: '보드', href: '/' },
   { label: '템플릿', href: '/templates' },
 ] as const
 
-export function Nav({ currentUser, members }: { currentUser: User; members: User[] }) {
+export function Nav() {
   const pathname = usePathname()
-  const [profileOpen, setProfileOpen] = useState(false)
+  const { currentUser, members, selectUser } = useCurrentUser()
   const [membersOpen, setMembersOpen] = useState(false)
 
   function isActive(href: string): boolean {
@@ -46,37 +44,31 @@ export function Nav({ currentUser, members }: { currentUser: User; members: User
         ))}
       </nav>
 
-      <div className="px-4 py-3 border-t border-zinc-100">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-zinc-200 text-zinc-600 text-[10px] font-medium shrink-0">
-            {initials(currentUser.name)}
-          </span>
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-zinc-900 tracking-tight truncate">{currentUser.name}</p>
-            <p className="text-[11px] text-zinc-400 tracking-tight truncate">{currentUser.email}</p>
-          </div>
+      <div className="px-4 py-3 border-t border-zinc-100 space-y-2">
+        <div>
+          <label className="block text-[11px] text-zinc-400 tracking-tight mb-1">현재 사용자</label>
+          {members.length > 0 ? (
+            <select
+              className="w-full px-2 py-1.5 text-[12px] border border-zinc-200 rounded text-zinc-700 bg-white outline-none focus:border-zinc-400 tracking-tight"
+              value={currentUser?.id ?? ''}
+              onChange={e => selectUser(e.target.value)}
+            >
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          ) : (
+            <p className="text-[12px] text-zinc-400 tracking-tight">멤버를 먼저 추가해주세요.</p>
+          )}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => setProfileOpen(true)}
-            className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
-          >
-            <Pencil size={11} />
-            프로필 수정
-          </button>
-          <button
-            type="button"
-            onClick={() => setMembersOpen(true)}
-            className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
-          >
-            <Users size={11} />
-            멤버 관리
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setMembersOpen(true)}
+          className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
+        >
+          <Users size={11} />
+          멤버 관리
+        </button>
       </div>
 
-      {profileOpen && <ProfileModal user={currentUser} onClose={() => setProfileOpen(false)} />}
       {membersOpen && <MembersModal members={members} onClose={() => setMembersOpen(false)} />}
     </aside>
   )

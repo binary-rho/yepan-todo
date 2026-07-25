@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getCurrentUser } from '@/lib/auth'
 import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
@@ -15,14 +14,12 @@ import {
   templateInputSchema,
   webhookUrlSchema,
   schedulePhasesSchema,
-  profileSchema,
   memberInputSchema,
   memberImportListSchema,
   projectNameSchema,
   projectNoteSchema,
 } from '@/lib/validation'
 import type { TemplateInput } from '@/lib/validation'
-import { PROFILE_USER_ID } from '@/lib/profile'
 import type { TaskStatus } from '@/types'
 
 type ServerClient = ReturnType<typeof createSupabaseDbClient>
@@ -40,6 +37,17 @@ async function projectWriteError(supabase: ServerClient, projectId: string): Pro
   return null
 }
 
+// 로그인이 없으므로 "누가 했는지"는 화면에서 선택한 사용자(actorId)를 그대로 믿을 수 없다.
+// 매 액션마다 실제 존재하는 담당자인지만 서버에서 검증한다.
+async function requireActor(supabase: ServerClient, actorId: unknown): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (typeof actorId !== 'string' || !actorId) {
+    return { ok: false, error: '작업할 사용자가 선택되지 않았습니다. 좌측 하단에서 사용자를 선택해주세요.' }
+  }
+  const { data } = await supabase.from('users').select('id').eq('id', actorId).maybeSingle()
+  if (!data) return { ok: false, error: '선택된 사용자를 찾을 수 없습니다. 다시 선택해주세요.' }
+  return { ok: true, id: actorId }
+}
+
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
 function revalidateBoards(taskId?: string): void {
@@ -51,14 +59,14 @@ export async function changeTaskStatus(input: {
   taskId: string
   toStatus: string
   reason?: string | null
-}): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
+}, actorId: string): Promise<ActionResult> {
   const parsed = statusChangeSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const actor = await requireActor(supabase, actorId)
+  if (!actor.ok) return actor
+
   const { data: task } = await supabase
     .from('tasks')
     .select('id, title, status, assignee_id, project_id')
@@ -78,7 +86,7 @@ export async function changeTaskStatus(input: {
     task_id: task.id,
     from_status: task.status,
     to_status: toStatus,
-    changed_by: user.id,
+    changed_by: actor.id,
     reason,
   })
   if (historyError) return { ok: false, error: '상태 변경 이력 기록에 실패했습니다.' }
@@ -100,8 +108,6 @@ export async function changeTaskStatus(input: {
 
 // 대시보드에서 담당자를 바로 변경한다. (상세 진입 없이)
 export async function changeTaskAssignee(taskId: string, assigneeId: string): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
   if (!assigneeId) return { ok: false, error: '담당자를 선택해주세요.' }
 
   const supabase = createSupabaseDbClient()
@@ -156,14 +162,14 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
   return { ok: true }
 }
 
-export async function createTask(projectId: string, input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
+export async function createTask(projectId: string, input: unknown, actorId: string): Promise<ActionResult> {
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const actor = await requireActor(supabase, actorId)
+  if (!actor.ok) return actor
+
   const writeError = await projectWriteError(supabase, projectId)
   if (writeError) return { ok: false, error: writeError }
 
@@ -178,7 +184,7 @@ export async function createTask(projectId: string, input: unknown): Promise<Act
     task_id: created.id,
     from_status: null,
     to_status: 'todo',
-    changed_by: user.id,
+    changed_by: actor.id,
     reason: null,
   })
 
@@ -190,9 +196,6 @@ export async function createTask(projectId: string, input: unknown): Promise<Act
 }
 
 export async function updateTask(taskId: string, input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
@@ -204,17 +207,17 @@ export async function updateTask(taskId: string, input: unknown): Promise<Action
   return { ok: true }
 }
 
-export async function addComment(input: { taskId: string; body: string }): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
+export async function addComment(input: { taskId: string; body: string }, actorId: string): Promise<ActionResult> {
   const parsed = commentSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const actor = await requireActor(supabase, actorId)
+  if (!actor.ok) return actor
+
   const { error } = await supabase.from('comments').insert({
     task_id: parsed.data.taskId,
-    author_id: user.id,
+    author_id: actor.id,
     body: parsed.data.body,
   })
   if (error) return { ok: false, error: '코멘트 작성에 실패했습니다.' }
@@ -227,15 +230,15 @@ export async function createTasksFromTemplate(projectId: string, input: {
   templateId: string
   environment: string
   baseDate: string
-}): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
+}, actorId: string): Promise<ActionResult> {
   const parsed = templateUseSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
   if (!parsed.data.baseDate) return { ok: false, error: '기준 마감일을 선택해주세요.' }
 
   const supabase = createSupabaseDbClient()
+  const actor = await requireActor(supabase, actorId)
+  if (!actor.ok) return actor
+
   const writeError = await projectWriteError(supabase, projectId)
   if (writeError) return { ok: false, error: writeError }
 
@@ -271,28 +274,12 @@ export async function createTasksFromTemplate(projectId: string, input: {
       task_id: t.id,
       from_status: null,
       to_status: 'todo' as TaskStatus,
-      changed_by: user.id,
+      changed_by: actor.id,
       reason: null,
     })),
   )
 
   revalidateBoards()
-  return { ok: true }
-}
-
-// 운영자 프로필(이름/이메일) 수정. 로그인이 없으므로 이 값이 곧 "현재 사용자"다.
-export async function updateProfile(input: unknown): Promise<ActionResult> {
-  const parsed = profileSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
-
-  const supabase = createSupabaseDbClient()
-  const { error } = await supabase
-    .from('users')
-    .update({ name: parsed.data.name, email: parsed.data.email })
-    .eq('id', PROFILE_USER_ID)
-  if (error) return { ok: false, error: '프로필 저장에 실패했습니다.' }
-
-  revalidatePath('/')
   return { ok: true }
 }
 
@@ -306,7 +293,6 @@ export async function createMember(input: unknown): Promise<ActionResult> {
     id: crypto.randomUUID(),
     name: parsed.data.name,
     email: parsed.data.email,
-    role: 'assignee',
     team_role: parsed.data.teamRole ?? null,
   })
   if (error) return { ok: false, error: '멤버 추가에 실패했습니다.' }
@@ -343,7 +329,6 @@ export async function createMembersBulk(input: unknown): Promise<ActionResult> {
     id: crypto.randomUUID(),
     name: m.name,
     email: m.email,
-    role: 'assignee' as const,
     team_role: null,
   }))
   const { error } = await supabase.from('users').upsert(rows, { onConflict: 'email', ignoreDuplicates: true })
@@ -417,10 +402,8 @@ export async function importTeamsMembers(): Promise<ImportMembersResult> {
   }
 }
 
-// 운영자 프로필은 삭제 불가. 항목/이력에 연결된 멤버도 FK 로 삭제가 막힌다.
+// 항목/이력에 연결된 멤버는 FK 로 삭제가 막힌다.
 export async function deleteMember(memberId: string): Promise<ActionResult> {
-  if (memberId === PROFILE_USER_ID) return { ok: false, error: '운영자 프로필은 삭제할 수 없습니다.' }
-
   const supabase = createSupabaseDbClient()
   const { error } = await supabase.from('users').delete().eq('id', memberId)
   if (error) return { ok: false, error: '연결된 항목이나 이력이 있어 삭제할 수 없습니다.' }
@@ -462,9 +445,6 @@ function toTemplateItemRows(templateId: string, items: TemplateInput['items']) {
 }
 
 export async function createTemplate(input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
   const parsed = templateInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
@@ -487,9 +467,6 @@ export async function createTemplate(input: unknown): Promise<ActionResult> {
 
 // 템플릿 항목은 전체 교체 방식으로 저장한다. (항목 수가 적고 순서/구성 관리가 단순함)
 export async function updateTemplate(templateId: string, input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
   const parsed = templateInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
@@ -567,21 +544,21 @@ export async function setProjectArchived(projectId: string, archived: boolean): 
   return { ok: true }
 }
 
-export async function addProjectNote(input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
-
+export async function addProjectNote(input: unknown, actorId: string): Promise<ActionResult> {
   const parsed = projectNoteSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const actor = await requireActor(supabase, actorId)
+  if (!actor.ok) return actor
+
   const writeError = await projectWriteError(supabase, parsed.data.projectId)
   if (writeError) return { ok: false, error: writeError }
 
   const { error } = await supabase.from('project_notes').insert({
     project_id: parsed.data.projectId,
     body: parsed.data.body,
-    author_id: user.id,
+    author_id: actor.id,
   })
   if (error) return { ok: false, error: '메모 저장에 실패했습니다.' }
 

@@ -1,14 +1,14 @@
 export type TaskStatus = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
 export type Environment = 'dev' | 'stg' | 'prd'
-export type UserRole = 'admin' | 'assignee'
 // 담당자 직군 라벨. 미정(null)이 기본값이다.
 export type TeamRole = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
+// 로그인/권한 등급이 없다. 모든 담당자는 동등하며, 화면에서 "현재 사용자"로
+// 선택한 사람이 곧 작업자(changed_by/author_id)가 된다.
 export interface User {
   id: string
   email: string
   name: string
-  role: UserRole
   teamRole: TeamRole | null
 }
 

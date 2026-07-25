@@ -6,6 +6,7 @@ import { X, Trash2 } from 'lucide-react'
 import type { ProjectNote } from '@/types'
 import { formatDateTime } from '@/lib/date'
 import { addProjectNote, deleteProjectNote } from '@/lib/actions'
+import { useCurrentUser } from '@/components/CurrentUserProvider'
 
 interface ProjectNotesPanelProps {
   projectId: string
@@ -16,15 +17,20 @@ interface ProjectNotesPanelProps {
 
 export function ProjectNotesPanel({ projectId, notes, readOnly, onClose }: ProjectNotesPanelProps) {
   const router = useRouter()
+  const { currentUser } = useCurrentUser()
   const [body, setBody] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function submit() {
     if (!body.trim()) return
+    if (!currentUser) {
+      setError('작업할 사용자를 먼저 선택해주세요.')
+      return
+    }
     setError(null)
     startTransition(async () => {
-      const result = await addProjectNote({ projectId, body: body.trim() })
+      const result = await addProjectNote({ projectId, body: body.trim() }, currentUser.id)
       if (!result.ok) {
         setError(result.error)
         return

@@ -7,6 +7,7 @@ import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from
 import { formatDateTime } from '@/lib/date'
 import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
+import { useCurrentUser } from '@/components/CurrentUserProvider'
 import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
@@ -32,6 +33,7 @@ const STATUS_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
 
 export function TaskDetailView({ task, userList, comments, histories, screenshotUrl, phases }: TaskDetailViewProps) {
   const router = useRouter()
+  const { currentUser } = useCurrentUser()
   const [commentText, setCommentText] = useState('')
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -46,9 +48,13 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   const nextStatuses = allowedNextStatuses(task.status)
 
   function runStatusChange(newStatus: TaskStatus, reason?: string) {
+    if (!currentUser) {
+      setActionError('작업할 사용자를 먼저 선택해주세요.')
+      return
+    }
     setActionError(null)
     startTransition(async () => {
-      const result = await changeTaskStatus({ taskId: task.id, toStatus: newStatus, reason: reason ?? null })
+      const result = await changeTaskStatus({ taskId: task.id, toStatus: newStatus, reason: reason ?? null }, currentUser.id)
       if (!result.ok) {
         setActionError(result.error)
         return
@@ -59,9 +65,13 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
 
   function submitComment() {
     if (!commentText.trim()) return
+    if (!currentUser) {
+      setActionError('작업할 사용자를 먼저 선택해주세요.')
+      return
+    }
     setActionError(null)
     startTransition(async () => {
-      const result = await addComment({ taskId: task.id, body: commentText.trim() })
+      const result = await addComment({ taskId: task.id, body: commentText.trim() }, currentUser.id)
       if (!result.ok) {
         setActionError(result.error)
         return
