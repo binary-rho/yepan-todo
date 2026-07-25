@@ -16,6 +16,8 @@ import {
   webhookUrlSchema,
   schedulePhasesSchema,
   profileSchema,
+  memberInputSchema,
+  memberImportListSchema,
   projectNameSchema,
   projectNoteSchema,
 } from '@/lib/validation'
@@ -296,7 +298,7 @@ export async function updateProfile(input: unknown): Promise<ActionResult> {
 
 // 담당자(멤버) 추가. 이메일은 Teams @멘션 id(UPN)로도 쓰이므로 실제 조직 이메일을 넣는다.
 export async function createMember(input: unknown): Promise<ActionResult> {
-  const parsed = profileSchema.safeParse(input)
+  const parsed = memberInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
@@ -305,6 +307,7 @@ export async function createMember(input: unknown): Promise<ActionResult> {
     name: parsed.data.name,
     email: parsed.data.email,
     role: 'assignee',
+    team_role: parsed.data.teamRole ?? null,
   })
   if (error) return { ok: false, error: '멤버 추가에 실패했습니다.' }
 
@@ -314,19 +317,104 @@ export async function createMember(input: unknown): Promise<ActionResult> {
 }
 
 export async function updateMember(memberId: string, input: unknown): Promise<ActionResult> {
-  const parsed = profileSchema.safeParse(input)
+  const parsed = memberInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
   const { error } = await supabase
     .from('users')
-    .update({ name: parsed.data.name, email: parsed.data.email })
+    .update({ name: parsed.data.name, email: parsed.data.email, team_role: parsed.data.teamRole ?? null })
     .eq('id', memberId)
   if (error) return { ok: false, error: '멤버 수정에 실패했습니다.' }
 
   revalidatePath('/')
   revalidatePath('/templates')
   return { ok: true }
+}
+
+// 팀즈에서 가져온 멤버를 일괄 등록한다. 역할은 미정(null)으로 시작하며 이후 각자 수정한다.
+// 이메일이 이미 등록돼 있으면 조용히 건너뛴다(unique 제약 위반 방지).
+export async function createMembersBulk(input: unknown): Promise<ActionResult> {
+  const parsed = memberImportListSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const rows = parsed.data.map((m) => ({
+    id: crypto.randomUUID(),
+    name: m.name,
+    email: m.email,
+    role: 'assignee' as const,
+    team_role: null,
+  }))
+  const { error } = await supabase.from('users').upsert(rows, { onConflict: 'email', ignoreDuplicates: true })
+  if (error) return { ok: false, error: '멤버 일괄 추가에 실패했습니다.' }
+
+  revalidatePath('/')
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
+interface GraphTokenResponse {
+  access_token?: string
+}
+interface GraphMember {
+  displayName?: string
+  email?: string
+}
+interface GraphMembersResponse {
+  value?: GraphMember[]
+}
+
+export type ImportMembersResult =
+  | { ok: true; members: { name: string; email: string }[] }
+  | { ok: false; error: string }
+
+// Microsoft Graph 로 팀즈 채널(팀) 멤버를 조회한다. 연동 정보가 없거나 실패하면 그냥 실패를 돌려준다.
+// 필요한 환경변수: MS_GRAPH_TENANT_ID, MS_GRAPH_CLIENT_ID, MS_GRAPH_CLIENT_SECRET, MS_GRAPH_TEAM_ID
+export async function importTeamsMembers(): Promise<ImportMembersResult> {
+  const tenantId = process.env.MS_GRAPH_TENANT_ID
+  const clientId = process.env.MS_GRAPH_CLIENT_ID
+  const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET
+  const teamId = process.env.MS_GRAPH_TEAM_ID
+  if (!tenantId || !clientId || !clientSecret || !teamId) {
+    return {
+      ok: false,
+      error: 'Microsoft Graph 연동 정보가 설정되지 않았습니다. (MS_GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET/TEAM_ID)',
+    }
+  }
+
+  try {
+    const tokenRes = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: 'https://graph.microsoft.com/.default',
+      }),
+    })
+    if (!tokenRes.ok) return { ok: false, error: 'Microsoft 인증에 실패했습니다.' }
+    const tokenJson = (await tokenRes.json()) as GraphTokenResponse
+    if (!tokenJson.access_token) return { ok: false, error: 'Microsoft 인증에 실패했습니다.' }
+
+    const membersRes = await fetch(`https://graph.microsoft.com/v1.0/teams/${teamId}/members`, {
+      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+    })
+    if (!membersRes.ok) {
+      return { ok: false, error: '팀 멤버 조회에 실패했습니다. 앱 권한/관리자 동의를 확인해주세요.' }
+    }
+    const membersJson = (await membersRes.json()) as GraphMembersResponse
+    const members = (membersJson.value ?? [])
+      .filter((m): m is Required<Pick<GraphMember, 'email'>> & GraphMember => Boolean(m.email))
+      .map((m) => ({ name: m.displayName ?? m.email, email: m.email }))
+
+    if (members.length === 0) return { ok: false, error: '가져올 멤버가 없습니다.' }
+    return { ok: true, members }
+  } catch (e) {
+    console.error('[graph] 팀즈 멤버 조회 실패', e)
+    return { ok: false, error: '팀즈 멤버를 가져오는 중 오류가 발생했습니다.' }
+  }
 }
 
 // 운영자 프로필은 삭제 불가. 항목/이력에 연결된 멤버도 FK 로 삭제가 막힌다.

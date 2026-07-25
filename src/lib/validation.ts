@@ -65,6 +65,21 @@ export const profileSchema = z.object({
 })
 export type ProfileInput = z.infer<typeof profileSchema>
 
+export const teamRoleSchema = z.enum(['사업', '기획', 'TPM', 'FE', 'BE'])
+
+export const memberInputSchema = z.object({
+  name: z.string().trim().min(1, '이름을 입력해주세요.').max(30, '이름은 30자 이하로 입력해주세요.'),
+  email: emailSchema,
+  teamRole: teamRoleSchema.nullable().optional().or(z.literal('').transform(() => null)),
+})
+export type MemberInput = z.infer<typeof memberInputSchema>
+
+export const memberImportItemSchema = z.object({
+  name: z.string().trim().min(1),
+  email: emailSchema,
+})
+export const memberImportListSchema = z.array(memberImportItemSchema).min(1, '가져올 멤버가 없습니다.')
+
 export const projectNameSchema = z
   .string()
   .trim()

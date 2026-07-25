@@ -1,12 +1,15 @@
 export type TaskStatus = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
 export type Environment = 'dev' | 'stg' | 'prd'
 export type UserRole = 'admin' | 'assignee'
+// 담당자 직군 라벨. 미정(null)이 기본값이다.
+export type TeamRole = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
 export interface User {
   id: string
   email: string
   name: string
   role: UserRole
+  teamRole: TeamRole | null
 }
 
 export type ProjectStatus = 'active' | 'archived'

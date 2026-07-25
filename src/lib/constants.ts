@@ -1,4 +1,4 @@
-import type { TaskStatus, Environment } from '@/types'
+import type { TaskStatus, Environment, TeamRole } from '@/types'
 
 // 화면에서 쓰는 상태는 할 일 / 완료 / 반려 3개다.
 // in_progress·review_requested 는 과거 이력 표시를 위해 라벨만 남겨둔다(신규 항목에는 사용하지 않음).
@@ -17,3 +17,6 @@ export const ENV_CONFIG: Record<Environment, { label: string; cls: string }> = {
 }
 
 export const KANBAN_COLUMNS: TaskStatus[] = ['todo', 'done', 'rejected']
+
+// 담당자 직군 라벨 선택지. 기본값은 미정(null)이다.
+export const TEAM_ROLES: TeamRole[] = ['사업', '기획', 'TPM', 'FE', 'BE']

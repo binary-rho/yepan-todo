@@ -96,6 +96,7 @@ supabase db reset
 | `NEXT_PUBLIC_SITE_URL` | 배포 절대 URL. 알림 링크에 사용 | 클라이언트 |
 | `CRON_SECRET` | 크론 엔드포인트 인증 시크릿 | 서버 전용 |
 | `NEXT_PUBLIC_PROFILE_USER_ID` | (선택) 현재 사용자로 쓸 `users` 프로필 id. 미설정 시 기본값 | 클라이언트 |
+| `MS_GRAPH_TENANT_ID` / `MS_GRAPH_CLIENT_ID` / `MS_GRAPH_CLIENT_SECRET` / `MS_GRAPH_TEAM_ID` | (선택) 멤버 관리 "팀즈에서 가져오기" 버튼용 Microsoft Graph 연동. 4개 중 하나라도 없으면 버튼이 실패 메시지만 반환하고 나머지 기능은 정상 동작 | 서버 전용 |
 
 > 메신저 웹훅 URL 은 환경 변수가 아니라 **관리자 보드 화면**에서 입력해 DB(`app_settings`)에 저장한다.
 

@@ -6,6 +6,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type TaskStatusDb = 'todo' | 'in_progress' | 'review_requested' | 'done' | 'rejected'
 export type EnvironmentDb = 'dev' | 'stg' | 'prd'
 export type UserRoleDb = 'admin' | 'assignee'
+export type TeamRoleDb = '사업' | '기획' | 'TPM' | 'FE' | 'BE'
 
 export interface Database {
   public: {
@@ -16,6 +17,7 @@ export interface Database {
           email: string
           name: string
           role: UserRoleDb
+          team_role: TeamRoleDb | null
           messenger_id: string | null
           created_at: string
         }
@@ -24,6 +26,7 @@ export interface Database {
           email: string
           name: string
           role?: UserRoleDb
+          team_role?: TeamRoleDb | null
           messenger_id?: string | null
           created_at?: string
         }
@@ -32,6 +35,7 @@ export interface Database {
           email?: string
           name?: string
           role?: UserRoleDb
+          team_role?: TeamRoleDb | null
           messenger_id?: string | null
           created_at?: string
         }
