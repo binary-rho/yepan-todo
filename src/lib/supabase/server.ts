@@ -4,7 +4,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/db/database.types'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
-import { AUTH_BYPASS } from '@/lib/dev-bypass'
 
 // 서버 컴포넌트 / Server Action / Route Handler 에서 사용하는 세션 인식 클라이언트.
 export function createSupabaseServerClient() {
@@ -27,8 +26,7 @@ export function createSupabaseServerClient() {
   })
 }
 
-// 데이터 조회/쓰기용 클라이언트. 우회 모드에서는 RLS 를 넘기는 서비스 롤을 사용한다.
+// 데이터 조회/쓰기용 클라이언트. 로그인이 없으므로 항상 서비스 롤(RLS 우회)을 사용한다.
 export function createSupabaseDbClient(): SupabaseClient<Database> {
-  if (AUTH_BYPASS) return createSupabaseServiceClient()
-  return createSupabaseServerClient()
+  return createSupabaseServiceClient()
 }

@@ -1,39 +1,18 @@
-import { redirect } from 'next/navigation'
 import type { User } from '@/types'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
 import { mapUser } from '@/lib/db/mappers'
-import { AUTH_BYPASS, BYPASS_USER_ID } from '@/lib/dev-bypass'
+import { PROFILE_USER_ID } from '@/lib/profile'
 
+// 로그인은 제거됐다. 앱은 users 테이블의 단일 운영자 프로필(PROFILE_USER_ID)을 "현재 사용자"로 사용한다.
 export async function getCurrentUser(): Promise<User | null> {
-  // 로그인 우회 모드: 실제 세션 없이 시드 사용자로 접근한다.
-  if (AUTH_BYPASS) {
-    const supabase = createSupabaseServiceClient()
-    const { data } = await supabase.from('users').select('*').eq('id', BYPASS_USER_ID).single()
-    return data ? mapUser(data) : null
-  }
-
-  const supabase = createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  // 사전 등록된 users 프로필이 있어야만 유효한 로그인으로 인정한다.
-  const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
-  if (!data) return null
-  return mapUser(data)
+  const supabase = createSupabaseServiceClient()
+  const { data } = await supabase.from('users').select('*').eq('id', PROFILE_USER_ID).maybeSingle()
+  return data ? mapUser(data) : null
 }
 
+// 프로필 행이 반드시 존재해야 한다(시드 또는 마이그레이션으로 보장). 없으면 설정 오류다.
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser()
-  // 로그인 검사: 우회 모드에선 getCurrentUser 가 시드 사용자를 돌려주므로 통과한다.
-  if (!user) redirect('/login')
-  return user
-}
-
-export async function requireAdmin(): Promise<User> {
-  const user = await requireUser()
-  if (user.role !== 'admin') redirect('/')
+  if (!user) throw new Error('운영자 프로필이 설정되지 않았습니다. seed.sql 또는 0005 마이그레이션을 실행해주세요.')
   return user
 }

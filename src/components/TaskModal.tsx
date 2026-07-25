@@ -45,7 +45,7 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const assignees = userList.filter(u => u.role === 'assignee')
+  const assignees = userList
 
   function handlePhaseChange(phaseId: string) {
     setSelectedPhaseId(phaseId)

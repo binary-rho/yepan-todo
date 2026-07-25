@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import { requireUser } from '@/lib/auth'
 import {
   getTaskById,
   getUsers,
@@ -13,7 +12,6 @@ import { TaskDetailView } from '@/components/TaskDetailView'
 export const dynamic = 'force-dynamic'
 
 export default async function TaskDetailPage({ params }: { params: { id: string } }) {
-  const currentUser = await requireUser()
   const task = await getTaskById(params.id)
   if (!task) notFound()
 
@@ -31,7 +29,6 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
       userList={users}
       comments={comments}
       histories={histories}
-      currentUser={currentUser}
       screenshotUrl={screenshotUrl}
       phases={phases}
     />

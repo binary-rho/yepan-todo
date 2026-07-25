@@ -1,26 +1,12 @@
--- 샘플 시드 데이터: 관리자 1명, 담당자 2명, tasks 5건, 템플릿 1건
--- 매직 링크 로그인이 되려면 auth.users 와 public.users 가 같은 id 로 함께 존재해야 한다.
+-- 샘플 시드 데이터: 운영자 프로필 1명 + 담당자 2명, tasks 5건, 템플릿 1건
+-- 로그인은 제거됐다. users 는 담당자/운영자 프로필 목록이며 auth 와 무관하다.
 -- (로컬: `supabase db reset` 시 자동 적용 / 운영: SQL 에디터에서 실행)
 
--- ─── Auth 계정 ────────────────────────────────────────────────────────────────
-insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
-values
-  ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'jisoo.park@telecom.co.kr', '', now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
-  ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'minjun.kim@telecom.co.kr', '', now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}'),
-  ('00000000-0000-0000-0000-000000000000', '33333333-3333-3333-3333-333333333333', 'authenticated', 'authenticated', 'seoyeon.lee@telecom.co.kr', '', now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
-on conflict (id) do nothing;
-
-insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-values
-  (gen_random_uuid(), '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', '{"sub":"11111111-1111-1111-1111-111111111111","email":"jisoo.park@telecom.co.kr"}', 'email', now(), now(), now()),
-  (gen_random_uuid(), '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', '{"sub":"22222222-2222-2222-2222-222222222222","email":"minjun.kim@telecom.co.kr"}', 'email', now(), now(), now()),
-  (gen_random_uuid(), '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333', '{"sub":"33333333-3333-3333-3333-333333333333","email":"seoyeon.lee@telecom.co.kr"}', 'email', now(), now(), now())
-on conflict do nothing;
-
--- ─── 프로필 ───────────────────────────────────────────────────────────────────
+-- ─── 프로필 / 담당자 ──────────────────────────────────────────────────────────
+-- id '1111…' 행이 앱이 사용하는 단일 운영자 프로필("현재 사용자")이다. 이름/이메일은 앱에서 수정 가능.
 insert into public.users (id, email, name, role, messenger_id)
 values
-  ('11111111-1111-1111-1111-111111111111', 'jisoo.park@telecom.co.kr', '박지수', 'admin', null),
+  ('11111111-1111-1111-1111-111111111111', 'me@example.com', '홍길동', 'admin', null),
   ('22222222-2222-2222-2222-222222222222', 'minjun.kim@telecom.co.kr', '김민준', 'assignee', null),
   ('33333333-3333-3333-3333-333333333333', 'seoyeon.lee@telecom.co.kr', '이서연', 'assignee', null)
 on conflict (id) do nothing;
@@ -28,8 +14,8 @@ on conflict (id) do nothing;
 -- ─── Tasks (5건) ──────────────────────────────────────────────────────────────
 insert into public.tasks (id, title, description, assignee_id, status, environment, due_date, is_blocking, confluence_url, verify_url, verify_point)
 values
-  ('aaaaaaa1-0000-0000-0000-000000000001', '요금제 노출 순서 설정', 'PRD 메인 요금제 목록 노출 순서를 변경합니다.', '22222222-2222-2222-2222-222222222222', 'in_progress', 'prd', '2026-07-15', true, 'https://confluence.example.com/pages/1001', 'https://admin.prd.telecom.co.kr/plans/order', '요금제 목록에서 5G Ultimate 요금제가 1번 위치인지 확인'),
-  ('aaaaaaa1-0000-0000-0000-000000000002', '가입 가능 연령 제한 값 등록', '청소년 요금제 최대 연령을 18세로 변경합니다.', '33333333-3333-3333-3333-333333333333', 'review_requested', 'stg', '2026-07-18', true, 'https://confluence.example.com/pages/1002', 'https://admin.stg.telecom.co.kr/plans/youth/age-limit', '최대 연령이 18세로 표시되는지 확인'),
+  ('aaaaaaa1-0000-0000-0000-000000000001', '요금제 노출 순서 설정', 'PRD 메인 요금제 목록 노출 순서를 변경합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'prd', '2026-07-15', true, 'https://confluence.example.com/pages/1001', 'https://admin.prd.telecom.co.kr/plans/order', '요금제 목록에서 5G Ultimate 요금제가 1번 위치인지 확인'),
+  ('aaaaaaa1-0000-0000-0000-000000000002', '가입 가능 연령 제한 값 등록', '청소년 요금제 최대 연령을 18세로 변경합니다.', '33333333-3333-3333-3333-333333333333', 'todo', 'stg', '2026-07-18', true, 'https://confluence.example.com/pages/1002', 'https://admin.stg.telecom.co.kr/plans/youth/age-limit', '최대 연령이 18세로 표시되는지 확인'),
   ('aaaaaaa1-0000-0000-0000-000000000003', '프로모션 배너 노출 기간 설정', '여름 특가 배너 노출 시작/종료일을 설정합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'dev', '2026-07-25', false, null, null, null),
   ('aaaaaaa1-0000-0000-0000-000000000004', '데이터 이월 정책 플래그 변경', '잔여 데이터 이월 기능 플래그를 활성화합니다.', '33333333-3333-3333-3333-333333333333', 'done', 'prd', null, false, 'https://confluence.example.com/pages/1013', 'https://admin.prd.telecom.co.kr/data/rollover-flag', '플래그 상태가 활성화(true)인지 확인'),
   ('aaaaaaa1-0000-0000-0000-000000000005', '5G 전용 혜택 대상 단말 목록 업데이트', '신규 5G 단말 3종을 대상 목록에 추가합니다.', '22222222-2222-2222-2222-222222222222', 'rejected', 'prd', '2026-08-15', false, 'https://confluence.example.com/pages/1017', null, null)

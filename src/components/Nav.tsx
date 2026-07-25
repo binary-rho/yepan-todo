@@ -1,20 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Pencil } from 'lucide-react'
 import type { User } from '@/types'
 import { initials } from '@/lib/date'
-import { logout } from '@/lib/auth-actions'
+import { ProfileModal } from '@/components/ProfileModal'
 
 const NAV_ITEMS = [
-  { label: '내 할 일', href: '/', adminOnly: false },
-  { label: '전체 보드', href: '/board', adminOnly: true },
-  { label: '템플릿', href: '/templates', adminOnly: true },
+  { label: '보드', href: '/' },
+  { label: '템플릿', href: '/templates' },
 ] as const
 
 export function Nav({ currentUser }: { currentUser: User }) {
   const pathname = usePathname()
-  const isAdmin = currentUser.role === 'admin'
+  const [profileOpen, setProfileOpen] = useState(false)
 
   function isActive(href: string): boolean {
     if (href === '/') return pathname === '/'
@@ -28,7 +29,7 @@ export function Nav({ currentUser }: { currentUser: User }) {
       </div>
 
       <nav className="flex-1 px-2 py-2">
-        {NAV_ITEMS.filter(i => !i.adminOnly || isAdmin).map(item => (
+        {NAV_ITEMS.map(item => (
           <Link
             key={item.href}
             href={item.href}
@@ -50,18 +51,20 @@ export function Nav({ currentUser }: { currentUser: User }) {
           </span>
           <div className="min-w-0">
             <p className="text-[13px] font-medium text-zinc-900 tracking-tight truncate">{currentUser.name}</p>
-            <p className="text-[11px] text-zinc-400 tracking-tight">{currentUser.role === 'admin' ? '관리자' : '담당자'}</p>
+            <p className="text-[11px] text-zinc-400 tracking-tight truncate">{currentUser.email}</p>
           </div>
         </div>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
-          >
-            로그아웃
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
+        >
+          <Pencil size={11} />
+          프로필 수정
+        </button>
       </div>
+
+      {profileOpen && <ProfileModal user={currentUser} onClose={() => setProfileOpen(false)} />}
     </aside>
   )
 }

@@ -1,20 +1,19 @@
-import type { TaskStatus, UserRole } from '@/types'
+import type { TaskStatus } from '@/types'
 
-// todo -> in_progress -> review_requested -> done
-//                              |
-//                              +-> rejected -> in_progress
+// 상태는 3개(할 일/완료/반려)뿐이며, 로그인·역할이 없으므로 누구나(=단일 운영자) 전환할 수 있다.
+//   할 일  ─ 완료 / 반려
+//   완료   ─ 할 일(되돌리기)
+//   반려   ─ 할 일(다시 진행)
+// in_progress·review_requested 는 과거 이력에만 존재하므로 안전하게 '할 일'로 되돌릴 수 있게 둔다.
 const ALLOWED_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  todo: ['in_progress'],
-  in_progress: ['review_requested'],
-  review_requested: ['done', 'rejected'],
-  done: [],
-  rejected: ['in_progress'],
+  todo: ['done', 'rejected'],
+  done: ['todo'],
+  rejected: ['todo'],
+  in_progress: ['todo', 'done', 'rejected'],
+  review_requested: ['todo', 'done', 'rejected'],
 }
 
-// done / rejected 전환은 관리자만 가능하다.
-const ADMIN_ONLY_TARGETS: TaskStatus[] = ['done', 'rejected']
-
-// rejected 전환 시 사유 입력이 필수다.
+// 반려 전환 시 사유 입력이 필수다.
 export const REASON_REQUIRED_TARGET: TaskStatus = 'rejected'
 
 export type TransitionCheck = { ok: true } | { ok: false; reason: string }
@@ -22,14 +21,10 @@ export type TransitionCheck = { ok: true } | { ok: false; reason: string }
 export function validateTransition(
   from: TaskStatus,
   to: TaskStatus,
-  role: UserRole,
   reason: string | null,
 ): TransitionCheck {
   if (!ALLOWED_TRANSITIONS[from].includes(to)) {
     return { ok: false, reason: `'${from}' 상태에서 '${to}' 상태로 변경할 수 없습니다.` }
-  }
-  if (ADMIN_ONLY_TARGETS.includes(to) && role !== 'admin') {
-    return { ok: false, reason: '해당 상태 변경은 관리자만 수행할 수 있습니다.' }
   }
   if (to === REASON_REQUIRED_TARGET && !reason?.trim()) {
     return { ok: false, reason: '반려 사유를 입력해주세요.' }
@@ -37,8 +32,6 @@ export function validateTransition(
   return { ok: true }
 }
 
-export function allowedNextStatuses(from: TaskStatus, role: UserRole): TaskStatus[] {
-  return ALLOWED_TRANSITIONS[from].filter(
-    (to) => !ADMIN_ONLY_TARGETS.includes(to) || role === 'admin',
-  )
+export function allowedNextStatuses(from: TaskStatus): TaskStatus[] {
+  return ALLOWED_TRANSITIONS[from]
 }

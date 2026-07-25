@@ -6,15 +6,7 @@ import { createSupabaseDbClient } from '@/lib/supabase/server'
 import { validateTransition } from '@/lib/transitions'
 import { toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
 import { writeSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
-import { uploadScreenshot } from '@/lib/storage'
-import { notifyTaskAssigned, notifyReviewRequested, notifyRejected } from '@/lib/notifications'
-
-type ServerClient = ReturnType<typeof createSupabaseDbClient>
-
-async function resolveUserName(supabase: ServerClient, userId: string): Promise<string> {
-  const { data } = await supabase.from('users').select('name').eq('id', userId).single()
-  return data?.name ?? '담당자'
-}
+import { notifyTaskAssigned, notifyRejected } from '@/lib/notifications'
 import {
   taskInputSchema,
   statusChangeSchema,
@@ -22,14 +14,22 @@ import {
   templateUseSchema,
   webhookUrlSchema,
   schedulePhasesSchema,
+  profileSchema,
 } from '@/lib/validation'
+import { PROFILE_USER_ID } from '@/lib/profile'
 import type { TaskStatus } from '@/types'
+
+type ServerClient = ReturnType<typeof createSupabaseDbClient>
+
+async function resolveUserName(supabase: ServerClient, userId: string): Promise<string> {
+  const { data } = await supabase.from('users').select('name').eq('id', userId).single()
+  return data?.name ?? '담당자'
+}
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
 function revalidateBoards(taskId?: string): void {
   revalidatePath('/')
-  revalidatePath('/board')
   if (taskId) revalidatePath(`/tasks/${taskId}`)
 }
 
@@ -39,7 +39,7 @@ export async function changeTaskStatus(input: {
   reason?: string | null
 }): Promise<ActionResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '로그인이 필요합니다.' }
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
   const parsed = statusChangeSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -50,11 +50,11 @@ export async function changeTaskStatus(input: {
     .select('id, title, status, assignee_id')
     .eq('id', parsed.data.taskId)
     .maybeSingle()
-  if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
 
   const reason = parsed.data.reason?.trim() || null
   const toStatus = parsed.data.toStatus as TaskStatus
-  const check = validateTransition(task.status, toStatus, user.role, reason)
+  const check = validateTransition(task.status, toStatus, reason)
   if (!check.ok) return { ok: false, error: check.reason }
 
   const { error: historyError } = await supabase.from('task_history').insert({
@@ -72,10 +72,7 @@ export async function changeTaskStatus(input: {
     .eq('id', task.id)
   if (updateError) return { ok: false, error: '상태 변경에 실패했습니다.' }
 
-  if (toStatus === 'review_requested') {
-    const assigneeName = await resolveUserName(supabase, task.assignee_id)
-    await notifyReviewRequested({ taskId: task.id, title: task.title, assigneeName })
-  } else if (toStatus === 'rejected') {
+  if (toStatus === 'rejected') {
     const assigneeName = await resolveUserName(supabase, task.assignee_id)
     await notifyRejected({ taskId: task.id, title: task.title, assigneeName, reason: reason ?? '' })
   }
@@ -84,64 +81,9 @@ export async function changeTaskStatus(input: {
   return { ok: true }
 }
 
-// in_progress → review_requested 전환 시 스크린샷을 함께 첨부한다(선택).
-export async function requestReviewWithScreenshot(formData: FormData): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '로그인이 필요합니다.' }
-
-  const taskId = String(formData.get('taskId') ?? '')
-  if (!taskId) return { ok: false, error: '항목 정보가 없습니다.' }
-
-  const supabase = createSupabaseDbClient()
-  const { data: task } = await supabase
-    .from('tasks')
-    .select('id, title, status, assignee_id')
-    .eq('id', taskId)
-    .maybeSingle()
-  if (!task) return { ok: false, error: '항목을 찾을 수 없거나 접근 권한이 없습니다.' }
-
-  const check = validateTransition(task.status, 'review_requested', user.role, null)
-  if (!check.ok) return { ok: false, error: check.reason }
-
-  const file = formData.get('screenshot')
-  if (file instanceof File && file.size > 0) {
-    try {
-      const path = await uploadScreenshot(task.id, file)
-      const { error: urlError } = await supabase
-        .from('tasks')
-        .update({ screenshot_url: path })
-        .eq('id', task.id)
-      if (urlError) return { ok: false, error: '스크린샷 저장에 실패했습니다.' }
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : '스크린샷 업로드에 실패했습니다.' }
-    }
-  }
-
-  const { error: historyError } = await supabase.from('task_history').insert({
-    task_id: task.id,
-    from_status: task.status,
-    to_status: 'review_requested',
-    changed_by: user.id,
-    reason: null,
-  })
-  if (historyError) return { ok: false, error: '상태 변경 이력 기록에 실패했습니다.' }
-
-  const { error: updateError } = await supabase
-    .from('tasks')
-    .update({ status: 'review_requested' })
-    .eq('id', task.id)
-  if (updateError) return { ok: false, error: '완료 요청에 실패했습니다.' }
-
-  const assigneeName = await resolveUserName(supabase, task.assignee_id)
-  await notifyReviewRequested({ taskId: task.id, title: task.title, assigneeName })
-
-  revalidateBoards(task.id)
-  return { ok: true }
-}
-
 export async function createTask(input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser()
-  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 항목을 생성할 수 있습니다.' }
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -171,7 +113,7 @@ export async function createTask(input: unknown): Promise<ActionResult> {
 
 export async function updateTask(taskId: string, input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser()
-  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 항목을 수정할 수 있습니다.' }
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
   const parsed = taskInputSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -186,7 +128,7 @@ export async function updateTask(taskId: string, input: unknown): Promise<Action
 
 export async function addComment(input: { taskId: string; body: string }): Promise<ActionResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: '로그인이 필요합니다.' }
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
   const parsed = commentSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -209,7 +151,7 @@ export async function createTasksFromTemplate(input: {
   baseDate: string
 }): Promise<ActionResult> {
   const user = await getCurrentUser()
-  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 템플릿으로 생성할 수 있습니다.' }
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
   const parsed = templateUseSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
@@ -256,11 +198,24 @@ export async function createTasksFromTemplate(input: {
   return { ok: true }
 }
 
-// 알림 웹훅 URL 은 관리자가 화면에서 입력한다. 빈 문자열이면 값을 비워(콘솔 폴백) 저장한다.
-export async function updateWebhookUrl(url: string): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 웹훅 URL을 변경할 수 있습니다.' }
+// 운영자 프로필(이름/이메일) 수정. 로그인이 없으므로 이 값이 곧 "현재 사용자"다.
+export async function updateProfile(input: unknown): Promise<ActionResult> {
+  const parsed = profileSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase
+    .from('users')
+    .update({ name: parsed.data.name, email: parsed.data.email })
+    .eq('id', PROFILE_USER_ID)
+  if (error) return { ok: false, error: '프로필 저장에 실패했습니다.' }
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+// 알림 웹훅 URL 은 화면에서 입력한다. 빈 문자열이면 값을 비워(=알림 미발송) 저장한다.
+export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   const trimmed = url.trim()
   if (trimmed) {
     const parsed = webhookUrlSchema.safeParse(trimmed)
@@ -271,15 +226,12 @@ export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   const { ok } = await writeSetting(supabase, WEBHOOK_SETTING_KEY, trimmed || null)
   if (!ok) return { ok: false, error: '웹훅 URL 저장에 실패했습니다.' }
 
-  revalidatePath('/board')
+  revalidatePath('/')
   return { ok: true }
 }
 
 // 일정(국면 목록)은 전체 교체 방식으로 저장한다. (국면 수가 적고 순서 관리가 단순함)
 export async function saveSchedulePhases(input: unknown): Promise<ActionResult> {
-  const user = await getCurrentUser()
-  if (!user || user.role !== 'admin') return { ok: false, error: '관리자만 일정을 편집할 수 있습니다.' }
-
   const parsed = schedulePhasesSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
@@ -301,6 +253,6 @@ export async function saveSchedulePhases(input: unknown): Promise<ActionResult> 
     if (insertError) return { ok: false, error: '일정 저장에 실패했습니다.' }
   }
 
-  revalidatePath('/board')
+  revalidatePath('/')
   return { ok: true }
 }

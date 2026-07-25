@@ -28,7 +28,7 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
 
-  const assignees = userList.filter(u => u.role === 'assignee')
+  const assignees = userList
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (envFilter !== 'all' && t.environment !== envFilter) return false
@@ -53,7 +53,7 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
   return (
     <div className="px-6 py-6 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">전체 보드</h1>
+        <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">보드</h1>
         <div className="flex gap-2">
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"

@@ -9,18 +9,18 @@ FO는 BO에 값이 세팅되어야 동작하는 영역이 많고 항목별 담�
 ## 기술 스택
 
 - Next.js 14 (App Router, Server Actions)
-- Supabase (PostgreSQL, Auth 매직 링크, RLS, Storage)
+- Supabase (PostgreSQL, Storage)
 - zod (입력 검증)
 - Tailwind CSS v4
 - Vercel (배포 + Cron)
 
 ## 화면
 
-- `/login` 이메일 매직 링크 로그인
-- `/` 담당자: 내 미완료 항목, 마감 초과/임박 구분
-- `/board` 관리자: 5개 상태 칸반, 진척률, 필터, 항목 생성, 템플릿
+로그인이 없다. 진입 즉시 보드가 보이며, 좌측 내비의 "프로필 수정"에서 현재 사용자(이름/이메일)를 바꾼다.
+
+- `/` 보드: 3개 상태(할 일 / 완료 / 반려) 칸반, 진척률, 필터, 항목 생성, 일정, 템플릿
 - `/tasks/[id]` 항목 상세: 상태 전환, 코멘트, 이력, 스크린샷 첨부
-- `/templates` 관리자: 템플릿으로 항목 일괄 생성
+- `/templates` 템플릿으로 항목 일괄 생성
 
 ---
 
@@ -69,18 +69,16 @@ supabase start
 supabase db reset
 ```
 `supabase start` 출력의 `API URL`, `anon key`, `service_role key` 를 `.env.local` 에 넣는다.
-로컬에서는 발송 메일이 Inbucket(예: http://localhost:54324)에 도착하므로 매직 링크를 거기서 확인한다.
+로그인이 없으므로 모든 DB 접근은 `service_role` 키로 이뤄진다 → 이 키를 반드시 채워야 한다.
 
 ### 방법 B. 클라우드 프로젝트
 1. https://supabase.com 에서 새 프로젝트를 만든다.
 2. 설정 > API 에서 `Project URL`, `anon public`, `service_role` 키를 복사해 `.env.local`(및 Vercel 환경 변수)에 넣는다.
 3. 마이그레이션 적용:
    - CLI: `supabase link --project-ref <ref>` 후 `supabase db push`
-   - 또는 대시보드 SQL Editor 에서 `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_storage.sql` 를 순서대로 실행.
+   - 또는 대시보드 SQL Editor 에서 `supabase/migrations/` 의 `0001_init.sql` → `0002_storage.sql` → `0003_app_settings.sql` → `0004_schedule.sql` → `0005_no_login_and_statuses.sql` 을 순서대로 실행.
 4. 샘플 데이터가 필요하면 SQL Editor 에서 `supabase/seed.sql` 을 실행한다. (운영에서는 생략 가능)
-5. Auth 설정:
-   - Authentication > URL Configuration 에서 **Site URL** 과 **Redirect URLs** 에 배포 도메인(`https://your-app.vercel.app`)과 `https://your-app.vercel.app/auth/callback` 을 등록한다. 로컬은 `http://localhost:3000`, `http://localhost:3000/auth/callback`.
-   - 매직 링크만 사용하므로 이메일 provider 를 켜 둔다.
+   - 로그인이 없으므로 별도 Auth 설정은 필요 없다. 앱은 `users` 의 운영자 프로필 행 하나를 "현재 사용자"로 사용한다(0005·seed 가 보장).
 
 > 스키마는 `types/index.ts` 의 타입과 1:1로 대응한다. DB는 snake_case, 앱 코드는 camelCase 이며 변환은 `src/lib/db/mappers.ts` 가 담당한다.
 
@@ -94,29 +92,28 @@ supabase db reset
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | 클라이언트 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon 키 (RLS 적용) | 클라이언트 |
-| `SUPABASE_SERVICE_ROLE_KEY` | 서비스 롤 키. 크론/스토리지 서명 URL 등 서버 전용 | **서버 전용, 노출 금지** |
-| `NEXT_PUBLIC_SITE_URL` | 배포 절대 URL. 매직 링크 redirect·알림 링크에 사용 | 클라이언트 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 서비스 롤 키. **모든 DB 접근이 이 키(RLS 우회)로 이뤄진다** | **서버 전용, 노출 금지** |
+| `NEXT_PUBLIC_SITE_URL` | 배포 절대 URL. 알림 링크에 사용 | 클라이언트 |
 | `CRON_SECRET` | 크론 엔드포인트 인증 시크릿 | 서버 전용 |
+| `NEXT_PUBLIC_PROFILE_USER_ID` | (선택) 현재 사용자로 쓸 `users` 프로필 id. 미설정 시 기본값 | 클라이언트 |
 
 > 메신저 웹훅 URL 은 환경 변수가 아니라 **관리자 보드 화면**에서 입력해 DB(`app_settings`)에 저장한다.
 
 ---
 
-## 4. 담당자 계정 등록 절차
+## 4. 프로필 / 담당자 관리
 
-사전 등록된 이메일만 로그인할 수 있다(미등록 이메일은 매직 링크 발송이 실패한다). 계정은 **auth 계정**과 **프로필(`public.users`)** 이 같은 `id` 로 함께 있어야 한다.
+로그인이 없다. `public.users` 는 담당자 목록이자 운영자 프로필 목록이며, 이 중 한 행(`NEXT_PUBLIC_PROFILE_USER_ID`, 기본값 `1111…`)이 앱의 "현재 사용자"다.
 
-권장 절차(대시보드):
-1. Authentication > Users > **Add user** 로 이메일을 추가한다(비밀번호 없이 매직 링크 사용). 생성된 사용자의 `id`(uuid)를 복사한다.
-2. SQL Editor 에서 프로필을 추가한다:
-   ```sql
-   insert into public.users (id, email, name, role, messenger_id)
-   values ('<복사한 uuid>', 'someone@telecom.co.kr', '홍길동', 'assignee', null);
-   ```
-   - `role` 은 `admin` 또는 `assignee`.
-3. 해당 사용자가 `/login` 에서 이메일을 입력하면 매직 링크를 받아 로그인된다.
+- **현재 사용자(이름/이메일) 변경**: 좌측 내비 "프로필 수정"에서 바로 편집한다.
+- **담당자 추가**(항목 배정 대상): SQL Editor 에서 users 행을 추가한다.
+  ```sql
+  insert into public.users (email, name, role)
+  values ('someone@telecom.co.kr', '김담당', 'assignee');
+  ```
+  (`id` 는 자동 생성된다. `role` 컬럼은 남아 있으나 접근 제어에는 쓰이지 않는다.)
 
-> 샘플 계정은 `supabase/seed.sql` 이 관리자 1명(`jisoo.park@telecom.co.kr`)과 담당자 2명을 생성한다.
+> 샘플 계정은 `supabase/seed.sql` 이 운영자 프로필 1명(`홍길동`)과 담당자 2명을 생성한다.
 
 ---
 
@@ -134,7 +131,7 @@ supabase db reset
 2. Vercel > Settings > Environment Variables 에 위 "3. 환경 변수" 를 모두 등록한다.
    - `NEXT_PUBLIC_SITE_URL` 은 배포 도메인(`https://your-app.vercel.app`)으로 설정한다.
    - `CRON_SECRET` 은 임의의 긴 랜덤 문자열로 설정한다.
-3. 배포 후 Supabase Auth 의 Site URL / Redirect URLs 에 배포 도메인과 `/auth/callback` 이 등록되어 있는지 확인한다(위 2-5).
+3. 배포 후 `SUPABASE_SERVICE_ROLE_KEY` 가 정확히 등록됐는지 확인한다(모든 DB 접근에 사용).
 4. Cron:
    - `vercel.json` 에 하루 한 번(`0 0 * * *`) `/api/cron/notify` 를 호출하도록 정의되어 있다.
    - Vercel Cron 은 요청 시 `Authorization: Bearer <CRON_SECRET>` 헤더를 자동으로 붙인다. 엔드포인트는 이 값을 검증하고 불일치 시 401 을 반환한다.
@@ -147,10 +144,10 @@ supabase db reset
 
 ## 7. 알림 동작
 
-- **즉시 발송**: 항목 생성/담당자 배정(담당자에게), `review_requested`(관리자에게), `rejected`(담당자에게, 사유 포함).
+- **즉시 발송**: 항목 생성/담당자 배정(담당자에게), `rejected`(담당자에게, 사유 포함).
 - **일괄 발송(크론, 하루 1회)**: 담당자당 한 건으로 합친 다이제스트(미완료 요약 + 오늘/2일 후 마감 + 마감 초과). 마감 초과는 관리자에게도 통지.
 - 모든 메시지에 항목의 `/tasks/[id]` 절대 경로 링크가 포함된다.
-- 웹훅 URL 은 **관리자 보드(`/board`) 상단 "알림 웹훅 URL" 필드**에서 입력하며 `app_settings` 테이블에 저장된다(자주 바뀌는 값이라 화면에서 관리). **URL 이 설정되지 않으면 알림을 발송하지 않는다.** 웹훅 페이로드는 `{ text: string }` 이며, 스펙이 확정되면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
+- 웹훅 URL 은 **보드(`/`) 상단 "알림 웹훅 URL" 필드**에서 입력하며 `app_settings` 테이블에 저장된다(자주 바뀌는 값이라 화면에서 관리). **URL 이 설정되지 않으면 알림을 발송하지 않는다.** 웹훅 페이로드는 `{ text: string }` 이며, 스펙이 확정되면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
 - Teams 웹훅은 채널 → **Workflows** → "Post to a channel when a webhook request is received" 템플릿으로 URL 을 발급받는다(구 Incoming Webhook 커넥터는 폐기됨).
 - 중복 발송은 `notification_log.dedupe_key` 로 차단한다.
 
@@ -167,7 +164,7 @@ src/
     db/                # queries, mappers, database.types
     notifications/     # 전송부 인터페이스, 즉시/크론 알림
     actions.ts         # Server Actions (생성/수정/상태전환/코멘트/템플릿)
-    auth.ts, auth-actions.ts, transitions.ts, validation.ts, storage.ts, constants.ts, date.ts
+    auth.ts, profile.ts, transitions.ts, validation.ts, storage.ts, constants.ts, date.ts
   types/index.ts       # 정본 타입
 supabase/
   migrations/          # 0001_init.sql, 0002_storage.sql

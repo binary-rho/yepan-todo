@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, Link as LinkIcon, ExternalLink } from 'lucide-react'
 import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
-import { changeTaskStatus, addComment, updateTask, requestReviewWithScreenshot } from '@/lib/actions'
+import { changeTaskStatus, addComment, updateTask } from '@/lib/actions'
+import { allowedNextStatuses } from '@/lib/transitions'
 import { StatusBadge, EnvBadge, BlockingBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
@@ -16,48 +17,37 @@ interface TaskDetailViewProps {
   userList: User[]
   comments: Comment[]
   histories: TaskHistory[]
-  currentUser: User
   screenshotUrl: string | null
   phases: SchedulePhase[]
 }
 
-export function TaskDetailView({ task, userList, comments, histories, currentUser, screenshotUrl, phases }: TaskDetailViewProps) {
+// 상태 전환 버튼의 라벨/스타일. (반려는 사유 입력 모달을 먼저 띄운다)
+const STATUS_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
+  todo: { label: '할 일로 이동', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
+  done: { label: '완료 처리', cls: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+  rejected: { label: '반려', cls: 'border border-red-200 text-red-600 hover:bg-red-50' },
+  in_progress: { label: '진행중', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
+  review_requested: { label: '완료요청', cls: 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50' },
+}
+
+export function TaskDetailView({ task, userList, comments, histories, screenshotUrl, phases }: TaskDetailViewProps) {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [commentText, setCommentText] = useState('')
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const isAdmin = currentUser.role === 'admin'
-  const backPath = isAdmin ? '/board' : '/'
-
   const assignee = userList.find(u => u.id === task.assigneeId)!
   const taskComments = comments.filter(c => c.taskId === task.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const taskHistories = histories.filter(h => h.taskId === task.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const latestRejection = taskHistories.filter(h => h.toStatus === 'rejected').slice(-1)[0]?.reason ?? null
+  const nextStatuses = allowedNextStatuses(task.status)
 
   function runStatusChange(newStatus: TaskStatus, reason?: string) {
     setActionError(null)
     startTransition(async () => {
       const result = await changeTaskStatus({ taskId: task.id, toStatus: newStatus, reason: reason ?? null })
-      if (!result.ok) {
-        setActionError(result.error)
-        return
-      }
-      router.refresh()
-    })
-  }
-
-  function submitReview() {
-    setActionError(null)
-    const formData = new FormData()
-    formData.set('taskId', task.id)
-    const file = fileRef.current?.files?.[0]
-    if (file) formData.set('screenshot', file)
-    startTransition(async () => {
-      const result = await requestReviewWithScreenshot(formData)
       if (!result.ok) {
         setActionError(result.error)
         return
@@ -93,7 +83,7 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
     <div className="px-6 py-6">
       <button
         className="flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-700 mb-4 tracking-tight transition-colors"
-        onClick={() => router.push(backPath)}
+        onClick={() => router.push('/')}
       >
         <ChevronRight size={13} className="rotate-180" />
         목록으로
@@ -188,64 +178,27 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
             </div>
           )}
 
-          {task.status !== 'done' && (
+          {nextStatuses.length > 0 && (
             <div className="bg-white border border-zinc-200 rounded p-4">
               <p className="text-[12px] font-medium text-zinc-500 tracking-tight mb-3">상태 변경</p>
-
-              {(task.status === 'todo' || task.status === 'rejected') && (
-                <button
-                  className="px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 transition-colors tracking-tight disabled:opacity-40"
-                  onClick={() => runStatusChange('in_progress')}
-                  disabled={isPending}
-                >
-                  진행중으로 변경
-                </button>
-              )}
-
-              {task.status === 'in_progress' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[12px] text-zinc-500 tracking-tight mb-1">스크린샷 첨부 <span className="text-zinc-400">(선택)</span></label>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif"
-                      className="w-full text-[13px] tracking-tight text-zinc-600 file:mr-3 file:px-3 file:py-1.5 file:text-[13px] file:border file:border-zinc-200 file:rounded file:bg-white file:text-zinc-600 hover:file:bg-zinc-50"
-                    />
-                  </div>
-                  <button
-                    className="px-3 py-1.5 text-[13px] border border-amber-300 rounded text-amber-700 hover:bg-amber-50 transition-colors tracking-tight disabled:opacity-40"
-                    onClick={submitReview}
-                    disabled={isPending}
-                  >
-                    완료 요청
-                  </button>
-                </div>
-              )}
-
-              {task.status === 'review_requested' && isAdmin && (
-                <div className="flex gap-2">
-                  <button
-                    className="px-3 py-1.5 text-[13px] bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors tracking-tight disabled:opacity-40"
-                    onClick={() => runStatusChange('done')}
-                    disabled={isPending}
-                  >
-                    승인
-                  </button>
-                  <button
-                    className="px-3 py-1.5 text-[13px] border border-red-200 rounded text-red-600 hover:bg-red-50 transition-colors tracking-tight disabled:opacity-40"
-                    onClick={() => setShowReject(true)}
-                    disabled={isPending}
-                  >
-                    반려
-                  </button>
-                </div>
-              )}
-
-              {task.status === 'review_requested' && !isAdmin && (
-                <p className="text-[13px] text-zinc-500 tracking-tight">완료 요청이 접수되었습니다. 관리자 검토를 기다리고 있습니다.</p>
-              )}
-
+              <div className="flex gap-2 flex-wrap">
+                {nextStatuses.map(target => {
+                  const { label, cls } = STATUS_ACTION[target]
+                  const onClick = target === 'rejected'
+                    ? () => setShowReject(true)
+                    : () => runStatusChange(target)
+                  return (
+                    <button
+                      key={target}
+                      className={`px-3 py-1.5 text-[13px] rounded transition-colors tracking-tight disabled:opacity-40 ${cls}`}
+                      onClick={onClick}
+                      disabled={isPending}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
               {actionError && (
                 <p className="text-[11px] text-red-500 mt-2 tracking-tight">{actionError}</p>
               )}
@@ -338,16 +291,14 @@ export function TaskDetailView({ task, userList, comments, histories, currentUse
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="bg-white border border-zinc-200 rounded p-4">
-              <button
-                className="text-[13px] text-zinc-600 hover:text-zinc-900 tracking-tight transition-colors"
-                onClick={() => setShowEdit(true)}
-              >
-                항목 수정
-              </button>
-            </div>
-          )}
+          <div className="bg-white border border-zinc-200 rounded p-4">
+            <button
+              className="text-[13px] text-zinc-600 hover:text-zinc-900 tracking-tight transition-colors"
+              onClick={() => setShowEdit(true)}
+            >
+              항목 수정
+            </button>
+          </div>
         </div>
       </div>
 

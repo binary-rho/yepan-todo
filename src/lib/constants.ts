@@ -1,7 +1,9 @@
 import type { TaskStatus, Environment } from '@/types'
 
+// 화면에서 쓰는 상태는 할 일 / 완료 / 반려 3개다.
+// in_progress·review_requested 는 과거 이력 표시를 위해 라벨만 남겨둔다(신규 항목에는 사용하지 않음).
 export const STATUS_CONFIG: Record<TaskStatus, { label: string; cls: string }> = {
-  todo:             { label: '대기',    cls: 'bg-zinc-100 text-zinc-600 border-zinc-200' },
+  todo:             { label: '할 일',   cls: 'bg-zinc-100 text-zinc-600 border-zinc-200' },
   in_progress:      { label: '진행중',  cls: 'bg-blue-50 text-blue-700 border-blue-200' },
   review_requested: { label: '완료요청', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   done:             { label: '완료',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -14,4 +16,4 @@ export const ENV_CONFIG: Record<Environment, { label: string; cls: string }> = {
   prd: { label: 'PRD', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
 }
 
-export const KANBAN_COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'review_requested', 'done', 'rejected']
+export const KANBAN_COLUMNS: TaskStatus[] = ['todo', 'done', 'rejected']
