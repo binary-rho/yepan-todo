@@ -3,19 +3,21 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Pencil } from 'lucide-react'
+import { Pencil, Users } from 'lucide-react'
 import type { User } from '@/types'
 import { initials } from '@/lib/date'
 import { ProfileModal } from '@/components/ProfileModal'
+import { MembersModal } from '@/components/MembersModal'
 
 const NAV_ITEMS = [
   { label: '보드', href: '/' },
   { label: '템플릿', href: '/templates' },
 ] as const
 
-export function Nav({ currentUser }: { currentUser: User }) {
+export function Nav({ currentUser, members }: { currentUser: User; members: User[] }) {
   const pathname = usePathname()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
 
   function isActive(href: string): boolean {
     if (href === '/') return pathname === '/'
@@ -54,17 +56,28 @@ export function Nav({ currentUser }: { currentUser: User }) {
             <p className="text-[11px] text-zinc-400 tracking-tight truncate">{currentUser.email}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setProfileOpen(true)}
-          className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
-        >
-          <Pencil size={11} />
-          프로필 수정
-        </button>
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
+          >
+            <Pencil size={11} />
+            프로필 수정
+          </button>
+          <button
+            type="button"
+            onClick={() => setMembersOpen(true)}
+            className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-600 tracking-tight transition-colors"
+          >
+            <Users size={11} />
+            멤버 관리
+          </button>
+        </div>
       </div>
 
       {profileOpen && <ProfileModal user={currentUser} onClose={() => setProfileOpen(false)} />}
+      {membersOpen && <MembersModal members={members} onClose={() => setMembersOpen(false)} />}
     </aside>
   )
 }

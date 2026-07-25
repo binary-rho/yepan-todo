@@ -294,6 +294,54 @@ export async function updateProfile(input: unknown): Promise<ActionResult> {
   return { ok: true }
 }
 
+// 담당자(멤버) 추가. 이메일은 Teams @멘션 id(UPN)로도 쓰이므로 실제 조직 이메일을 넣는다.
+export async function createMember(input: unknown): Promise<ActionResult> {
+  const parsed = profileSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase.from('users').insert({
+    id: crypto.randomUUID(),
+    name: parsed.data.name,
+    email: parsed.data.email,
+    role: 'assignee',
+  })
+  if (error) return { ok: false, error: '멤버 추가에 실패했습니다.' }
+
+  revalidatePath('/')
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
+export async function updateMember(memberId: string, input: unknown): Promise<ActionResult> {
+  const parsed = profileSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase
+    .from('users')
+    .update({ name: parsed.data.name, email: parsed.data.email })
+    .eq('id', memberId)
+  if (error) return { ok: false, error: '멤버 수정에 실패했습니다.' }
+
+  revalidatePath('/')
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
+// 운영자 프로필은 삭제 불가. 항목/이력에 연결된 멤버도 FK 로 삭제가 막힌다.
+export async function deleteMember(memberId: string): Promise<ActionResult> {
+  if (memberId === PROFILE_USER_ID) return { ok: false, error: '운영자 프로필은 삭제할 수 없습니다.' }
+
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase.from('users').delete().eq('id', memberId)
+  if (error) return { ok: false, error: '연결된 항목이나 이력이 있어 삭제할 수 없습니다.' }
+
+  revalidatePath('/')
+  revalidatePath('/templates')
+  return { ok: true }
+}
+
 // 알림 웹훅 URL 은 화면에서 입력한다. 빈 문자열이면 값을 비워(=알림 미발송) 저장한다.
 export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   const trimmed = url.trim()
