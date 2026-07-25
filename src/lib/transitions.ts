@@ -1,14 +1,12 @@
 import type { TaskStatus } from '@/types'
 
 // 상태는 3개(할 일/완료/반려)뿐이며, 로그인·역할이 없으므로 누구나(=단일 운영자) 전환할 수 있다.
-//   할 일  ─ 완료 / 반려
-//   완료   ─ 할 일(되돌리기)
-//   반려   ─ 할 일(다시 진행)
-// in_progress·review_requested 는 과거 이력에만 존재하므로 안전하게 '할 일'로 되돌릴 수 있게 둔다.
+// 노션식 칸반처럼 어느 컬럼으로든 자유롭게 옮길 수 있게, 자기 자신을 뺀 나머지 상태로의 이동을 모두 허용한다.
+// (반려로 옮길 때만 사유가 필수다)
 const ALLOWED_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   todo: ['done', 'rejected'],
-  done: ['todo'],
-  rejected: ['todo'],
+  done: ['todo', 'rejected'],
+  rejected: ['todo', 'done'],
   in_progress: ['todo', 'done', 'rejected'],
   review_requested: ['todo', 'done', 'rejected'],
 }

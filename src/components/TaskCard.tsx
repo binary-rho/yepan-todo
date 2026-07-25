@@ -1,5 +1,6 @@
 'use client'
 
+import type { DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, User } from '@/types'
 import { isOverdue } from '@/lib/date'
@@ -12,17 +13,34 @@ interface TaskCardProps {
   showAssignee?: boolean
   compact?: boolean
   rejectionReason?: string | null
+  draggable?: boolean
+  onDragStart?: (e: DragEvent) => void
+  onDragEnd?: (e: DragEvent) => void
+  dragging?: boolean
 }
 
-export function TaskCard({ task, assignee, showAssignee, compact, rejectionReason }: TaskCardProps) {
+export function TaskCard({
+  task,
+  assignee,
+  showAssignee,
+  compact,
+  rejectionReason,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  dragging,
+}: TaskCardProps) {
   const router = useRouter()
   const over = isOverdue(task.dueDate)
 
   return (
     <div
-      className={`bg-white border rounded p-3 cursor-pointer hover:bg-zinc-50 transition-colors ${
-        over ? 'border-red-200' : 'border-zinc-200'
-      }`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`bg-white border rounded p-3 hover:bg-zinc-50 transition-colors ${
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+      } ${dragging ? 'opacity-40' : ''} ${over ? 'border-red-200' : 'border-zinc-200'}`}
       onClick={() => router.push(`/tasks/${task.id}`)}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">

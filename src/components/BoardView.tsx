@@ -1,14 +1,16 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, FileText, Filter, CalendarRange } from 'lucide-react'
-import type { Environment, SchedulePhase, Task, User } from '@/types'
+import type { Environment, SchedulePhase, Task, TaskStatus, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
-import { createTask } from '@/lib/actions'
+import { allowedNextStatuses } from '@/lib/transitions'
+import { createTask, changeTaskStatus } from '@/lib/actions'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
+import { RejectModal } from '@/components/RejectModal'
 import { WebhookSettingField } from '@/components/WebhookSettingField'
 import { SchedulePhasesModal } from '@/components/SchedulePhasesModal'
 
@@ -27,8 +29,45 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
   const [blockingOnly, setBlockingOnly] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
+  const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
 
   const assignees = userList
+
+  function runMove(taskId: string, toStatus: TaskStatus, reason?: string) {
+    setMoveError(null)
+    startTransition(async () => {
+      const result = await changeTaskStatus({ taskId, toStatus, reason: reason ?? null })
+      if (!result.ok) {
+        setMoveError(result.error)
+        return
+      }
+      router.refresh()
+    })
+  }
+
+  // 카드를 특정 컬럼(상태)으로 이동. 반려로 옮길 때는 사유 입력 모달을 먼저 띄운다.
+  function moveToStatus(taskId: string, toStatus: TaskStatus) {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.status === toStatus) return
+    if (!allowedNextStatuses(task.status).includes(toStatus)) return
+    if (toStatus === 'rejected') {
+      setPendingRejectId(taskId)
+      return
+    }
+    runMove(taskId, toStatus)
+  }
+
+  function handleDrop(status: TaskStatus, e: DragEvent) {
+    e.preventDefault()
+    const id = draggingId ?? e.dataTransfer.getData('text/plain')
+    setDraggingId(null)
+    setDragOverStatus(null)
+    if (id) moveToStatus(id, status)
+  }
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (envFilter !== 'all' && t.environment !== envFilter) return false
@@ -130,16 +169,33 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
         </label>
       </div>
 
+      {moveError && (
+        <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded">
+          <p className="text-[12px] text-red-700 tracking-tight">{moveError}</p>
+        </div>
+      )}
+
       <div className="flex gap-3 overflow-x-auto pb-2 flex-1" style={{ minHeight: 0 }}>
         {KANBAN_COLUMNS.map(status => {
           const colTasks = filtered.filter(t => t.status === status)
+          const isDropTarget = dragOverStatus === status
           return (
-            <div key={status} className="shrink-0 w-60">
+            <div
+              key={status}
+              className="shrink-0 w-60"
+              onDragOver={e => { e.preventDefault(); setDragOverStatus(status) }}
+              onDragLeave={e => { if (e.currentTarget === e.target) setDragOverStatus(null) }}
+              onDrop={e => handleDrop(status, e)}
+            >
               <div className="flex items-center gap-1.5 mb-2">
                 <StatusBadge status={status} />
                 <span className="text-[12px] text-zinc-400 tabular-nums tracking-tight">{colTasks.length}</span>
               </div>
-              <div className="space-y-2">
+              <div
+                className={`space-y-2 rounded transition-colors min-h-[60px] ${
+                  isDropTarget ? 'bg-zinc-100 outline outline-1 outline-dashed outline-zinc-300 p-1' : ''
+                }`}
+              >
                 {colTasks.map(task => {
                   const assignee = userList.find(u => u.id === task.assigneeId)!
                   return (
@@ -150,12 +206,22 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
                       showAssignee
                       compact
                       rejectionReason={rejectionReasons[task.id] ?? null}
+                      draggable
+                      dragging={draggingId === task.id}
+                      onDragStart={e => {
+                        setDraggingId(task.id)
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.dataTransfer.setData('text/plain', task.id)
+                      }}
+                      onDragEnd={() => { setDraggingId(null); setDragOverStatus(null) }}
                     />
                   )
                 })}
                 {colTasks.length === 0 && (
                   <div className="border border-dashed border-zinc-200 rounded p-4 text-center">
-                    <span className="text-[12px] text-zinc-300 tracking-tight">없음</span>
+                    <span className="text-[12px] text-zinc-300 tracking-tight">
+                      {isDropTarget ? '여기로 이동' : '없음'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -180,6 +246,17 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
           onSaved={() => {
             setScheduleModalOpen(false)
             router.refresh()
+          }}
+        />
+      )}
+
+      {pendingRejectId && (
+        <RejectModal
+          onClose={() => setPendingRejectId(null)}
+          onConfirm={reason => {
+            const id = pendingRejectId
+            setPendingRejectId(null)
+            runMove(id, 'rejected', reason)
           }}
         />
       )}
