@@ -14,6 +14,7 @@ interface NewDashboardModalProps {
 export function NewDashboardModal({ currentProject, onClose }: NewDashboardModalProps) {
   const router = useRouter()
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [archiveCurrent, setArchiveCurrent] = useState(currentProject.status === 'active')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -25,6 +26,7 @@ export function NewDashboardModal({ currentProject, onClose }: NewDashboardModal
     startTransition(async () => {
       const result = await startNewDashboard({
         name: name.trim(),
+        description: description.trim() || null,
         archiveCurrentId: canArchiveCurrent && archiveCurrent ? currentProject.id : null,
       })
       if (!result.ok) {
@@ -60,6 +62,19 @@ export function NewDashboardModal({ currentProject, onClose }: NewDashboardModal
               onKeyDown={e => e.key === 'Enter' && create()}
               placeholder="예) 2026 여름 예판"
               autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-medium text-zinc-600 tracking-tight mb-1">
+              설명 <span className="text-zinc-400 font-normal">(선택, 보관함 목록에 표시됩니다)</span>
+            </label>
+            <textarea
+              className="w-full px-3 py-1.5 border border-zinc-200 rounded text-[13px] tracking-tight outline-none focus:border-zinc-400 resize-none"
+              rows={2}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="예) 어떤 목적의 대시보드인지 간단히 적어주세요"
             />
           </div>
 

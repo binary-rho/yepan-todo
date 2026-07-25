@@ -62,6 +62,17 @@ export async function resolveCurrentProject(projectId?: string): Promise<Project
   return projects.find((p) => p.status === 'active') ?? projects[0]
 }
 
+// 보관함 목록에서 회차별 항목 수를 보여주기 위한 집계. 회차 id -> 태스크 개수.
+export async function getProjectTaskCounts(): Promise<Record<string, number>> {
+  const supabase = createSupabaseDbClient()
+  const { data } = await supabase.from('tasks').select('project_id')
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    counts[row.project_id] = (counts[row.project_id] ?? 0) + 1
+  }
+  return counts
+}
+
 export async function getProjectNotes(projectId: string): Promise<ProjectNote[]> {
   const supabase = createSupabaseDbClient()
   const [{ data }, resolveName] = await Promise.all([

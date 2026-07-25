@@ -17,13 +17,15 @@ import { SchedulePhasesModal } from '@/components/SchedulePhasesModal'
 import { NewDashboardModal } from '@/components/NewDashboardModal'
 import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 
+// 카드가 눌려서 찌그러지지 않도록 컬럼 폭을 고정한다. 화면이 좁으면(축소가 아니라) 가로 스크롤이 생긴다.
+const COLUMN_WIDTH_CLASS = 'w-72 shrink-0'
+
 interface BoardViewProps {
   tasks: Task[]
   userList: User[]
   rejectionReasons: Record<string, string | null>
   webhookUrl: string | null
   phases: SchedulePhase[]
-  projects: Project[]
   currentProject: Project
   notes: ProjectNote[]
 }
@@ -34,7 +36,6 @@ export function BoardView({
   rejectionReasons,
   webhookUrl,
   phases,
-  projects,
   currentProject,
   notes,
 }: BoardViewProps) {
@@ -116,30 +117,17 @@ export function BoardView({
     return result
   }
 
-  function handleProjectChange(projectId: string) {
-    router.push(`/?project=${projectId}`)
-    router.refresh()
-  }
-
   return (
     <div className="flex h-full min-h-0">
       <div className="flex-1 min-w-0 px-6 py-6 flex flex-col overflow-y-auto">
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center justify-between mb-4 gap-3 overflow-x-auto">
+        <div className="flex items-center gap-2 min-w-0 shrink-0">
           <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight shrink-0">보드</h1>
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 shrink-0">
             <LayoutDashboard size={13} className="text-zinc-400 shrink-0" />
-            <select
-              className="max-w-[220px] px-2 py-1 text-[13px] border border-zinc-200 rounded text-zinc-700 bg-white outline-none focus:border-zinc-400 tracking-tight truncate"
-              value={currentProject.id}
-              onChange={e => handleProjectChange(e.target.value)}
-            >
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.status === 'archived' ? ' (보관)' : ''}
-                </option>
-              ))}
-            </select>
+            <span className="text-[13px] font-medium text-zinc-700 tracking-tight truncate max-w-[220px]">
+              {currentProject.name}
+            </span>
           </div>
           {readOnly && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border bg-zinc-100 text-zinc-500 border-zinc-200 tracking-tight shrink-0">
@@ -148,36 +136,36 @@ export function BoardView({
             </span>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setScheduleModalOpen(true)}
           >
-            <CalendarRange size={13} />
+            <CalendarRange size={13} className="shrink-0" />
             일정
           </button>
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => router.push('/templates')}
           >
-            <FileText size={13} />
+            <FileText size={13} className="shrink-0" />
             템플릿
           </button>
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setNewDashboardOpen(true)}
           >
-            <LayoutDashboard size={13} />
+            <LayoutDashboard size={13} className="shrink-0" />
             새 대시보드
           </button>
           {!readOnly && (
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40 shrink-0 whitespace-nowrap"
               onClick={() => setTaskModalOpen(true)}
               disabled={!currentUser}
               title={!currentUser ? '작업할 사용자를 먼저 선택해주세요' : undefined}
             >
-              <Plus size={13} />
+              <Plus size={13} className="shrink-0" />
               새 항목
             </button>
           )}
@@ -236,7 +224,7 @@ export function BoardView({
           return (
             <div
               key={status}
-              className="flex-1 min-w-[280px]"
+              className={COLUMN_WIDTH_CLASS}
               onDragOver={e => { if (readOnly) return; e.preventDefault(); setDragOverStatus(status) }}
               onDragLeave={e => { if (e.currentTarget === e.target) setDragOverStatus(null) }}
               onDrop={e => handleDrop(status, e)}

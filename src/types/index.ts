@@ -17,6 +17,7 @@ export type ProjectStatus = 'active' | 'archived'
 export interface Project {
   id: string
   name: string
+  description: string | null
   status: ProjectStatus
   createdAt: string
   archivedAt: string | null

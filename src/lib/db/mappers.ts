@@ -20,6 +20,7 @@ export function mapProject(row: ProjectRow): Project {
   return {
     id: row.id,
     name: row.name,
+    description: row.description,
     status: row.status === 'archived' ? 'archived' : 'active',
     createdAt: row.created_at,
     archivedAt: row.archived_at,

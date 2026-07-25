@@ -79,6 +79,12 @@ export const projectNameSchema = z
   .min(1, '대시보드 이름을 입력해주세요.')
   .max(40, '이름은 40자 이하로 입력해주세요.')
 
+export const projectDescriptionSchema = z
+  .string()
+  .trim()
+  .max(200, '설명은 200자 이하로 입력해주세요.')
+  .optional()
+
 export const projectNoteSchema = z.object({
   projectId: z.string().min(1),
   body: z.string().trim().min(1, '내용을 입력해주세요.'),

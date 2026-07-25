@@ -92,6 +92,7 @@ export interface Database {
         Row: {
           id: string
           name: string
+          description: string | null
           status: string
           created_at: string
           archived_at: string | null
@@ -99,6 +100,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
+          description?: string | null
           status?: string
           created_at?: string
           archived_at?: string | null
@@ -106,6 +108,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
+          description?: string | null
           status?: string
           created_at?: string
           archived_at?: string | null

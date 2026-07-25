@@ -56,7 +56,7 @@ export function ProjectNotesPanel({ projectId, notes, readOnly }: ProjectNotesPa
             <span className="text-[12px] text-zinc-400 tabular-nums tracking-tight">{notes.length}</span>
           )}
         </div>
-        <p className="text-[11px] text-zinc-400 tracking-tight">사업이 공유 안 해준 맥락·QA 이슈를 기록해 두세요.</p>
+        <p className="text-[11px] text-zinc-400 tracking-tight">사업이 공유 안 해준 맥락·QA 이슈를 자유롭게 기록해 두세요.</p>
       </div>
 
       {!readOnly && (
@@ -66,7 +66,7 @@ export function ProjectNotesPanel({ projectId, notes, readOnly }: ProjectNotesPa
             rows={3}
             value={body}
             onChange={e => setBody(e.target.value)}
-            placeholder="예) 36개월 할부 결제 오류 — 월요일부터 열리도록 토스와 협의됨(사업 미공유)"
+            placeholder="예) OOO 관련 배경 설명이나 QA 확인이 필요한 내용을 적어주세요"
           />
           {error && <p className="text-[11px] text-red-500 mt-1 tracking-tight">{error}</p>}
           <div className="flex justify-end mt-2">

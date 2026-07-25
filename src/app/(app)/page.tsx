@@ -4,7 +4,6 @@ import {
   getLatestRejectionReasons,
   getWebhookUrl,
   getSchedulePhases,
-  getProjects,
   resolveCurrentProject,
   getProjectNotes,
 } from '@/lib/db/queries'
@@ -18,10 +17,7 @@ export default async function BoardPage({
 }: {
   searchParams: { project?: string }
 }) {
-  const [projects, currentProject] = await Promise.all([
-    getProjects(),
-    resolveCurrentProject(searchParams.project),
-  ])
+  const currentProject = await resolveCurrentProject(searchParams.project)
 
   // 회차가 하나도 없으면 첫 대시보드 생성 화면을 보여준다. (마이그레이션 미실행 등)
   if (!currentProject) {
@@ -44,7 +40,6 @@ export default async function BoardPage({
       rejectionReasons={rejectionReasons}
       webhookUrl={webhookUrl}
       phases={phases}
-      projects={projects}
       currentProject={currentProject}
       notes={notes}
     />

@@ -10,6 +10,7 @@ import { useCurrentUser } from '@/components/CurrentUserProvider'
 const NAV_ITEMS = [
   { label: '보드', href: '/' },
   { label: '템플릿', href: '/templates' },
+  { label: '보관함', href: '/archive' },
 ] as const
 
 export function Nav() {

@@ -17,6 +17,7 @@ import {
   memberInputSchema,
   memberImportListSchema,
   projectNameSchema,
+  projectDescriptionSchema,
   projectNoteSchema,
 } from '@/lib/validation'
 import type { TemplateInput } from '@/lib/validation'
@@ -500,10 +501,13 @@ export async function deleteTemplate(templateId: string): Promise<ActionResult> 
 // 성공 시 새 회차 id 를 함께 돌려줘 클라이언트가 그 대시보드로 이동한다.
 export async function startNewDashboard(input: {
   name: string
+  description?: string | null
   archiveCurrentId?: string | null
 }): Promise<ActionResult & { projectId?: string }> {
-  const parsed = projectNameSchema.safeParse(input.name)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+  const parsedName = projectNameSchema.safeParse(input.name)
+  if (!parsedName.success) return { ok: false, error: parsedName.error.issues[0].message }
+  const parsedDescription = projectDescriptionSchema.safeParse(input.description ?? undefined)
+  if (!parsedDescription.success) return { ok: false, error: parsedDescription.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
 
@@ -517,7 +521,7 @@ export async function startNewDashboard(input: {
 
   const { data: created, error } = await supabase
     .from('projects')
-    .insert({ name: parsed.data, status: 'active' })
+    .insert({ name: parsedName.data, description: parsedDescription.data || null, status: 'active' })
     .select('id')
     .single()
   if (error || !created) return { ok: false, error: '대시보드 생성에 실패했습니다.' }
