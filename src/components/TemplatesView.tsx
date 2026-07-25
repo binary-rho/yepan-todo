@@ -9,15 +9,17 @@ import { TemplateUseModal } from '@/components/TemplateUseModal'
 interface TemplatesViewProps {
   templateList: Template[]
   itemsByTemplate: Record<string, string[]>
+  activeProject: { id: string; name: string } | null
 }
 
-export function TemplatesView({ templateList, itemsByTemplate }: TemplatesViewProps) {
+export function TemplatesView({ templateList, itemsByTemplate, activeProject }: TemplatesViewProps) {
   const router = useRouter()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [useModal, setUseModal] = useState<Template | null>(null)
 
   async function handleConfirm(templateId: string, env: Environment, baseDate: string) {
-    const result = await createTasksFromTemplate({ templateId, environment: env, baseDate })
+    if (!activeProject) return { ok: false as const, error: '활성 대시보드가 없습니다. 보드에서 새 대시보드를 먼저 만들어주세요.' }
+    const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate })
     if (result.ok) {
       setUseModal(null)
       router.refresh()
@@ -27,7 +29,14 @@ export function TemplatesView({ templateList, itemsByTemplate }: TemplatesViewPr
 
   return (
     <div className="px-6 py-6">
-      <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight mb-5">템플릿</h1>
+      <div className="flex items-baseline gap-2 mb-5">
+        <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">템플릿</h1>
+        {activeProject && (
+          <span className="text-[12px] text-zinc-400 tracking-tight">
+            생성 대상: <span className="text-zinc-600 font-medium">{activeProject.name}</span>
+          </span>
+        )}
+      </div>
 
       <div className="space-y-3 max-w-xl">
         {templateList.map(tpl => (

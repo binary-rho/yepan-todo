@@ -65,6 +65,17 @@ export const profileSchema = z.object({
 })
 export type ProfileInput = z.infer<typeof profileSchema>
 
+export const projectNameSchema = z
+  .string()
+  .trim()
+  .min(1, '대시보드 이름을 입력해주세요.')
+  .max(40, '이름은 40자 이하로 입력해주세요.')
+
+export const projectNoteSchema = z.object({
+  projectId: z.string().min(1),
+  body: z.string().trim().min(1, '내용을 입력해주세요.'),
+})
+
 export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
 
 const dateString = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, '올바른 날짜 형식이 아닙니다.')

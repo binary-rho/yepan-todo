@@ -15,6 +15,8 @@ import {
   webhookUrlSchema,
   schedulePhasesSchema,
   profileSchema,
+  projectNameSchema,
+  projectNoteSchema,
 } from '@/lib/validation'
 import { PROFILE_USER_ID } from '@/lib/profile'
 import type { TaskStatus } from '@/types'
@@ -24,6 +26,14 @@ type ServerClient = ReturnType<typeof createSupabaseDbClient>
 async function resolveUserName(supabase: ServerClient, userId: string): Promise<string> {
   const { data } = await supabase.from('users').select('name').eq('id', userId).single()
   return data?.name ?? '담당자'
+}
+
+// 보관된 회차에서는 항목 생성/상태변경/메모를 막는다. 문제 없으면 null 을 반환한다.
+async function projectWriteError(supabase: ServerClient, projectId: string): Promise<string | null> {
+  const { data } = await supabase.from('projects').select('status').eq('id', projectId).maybeSingle()
+  if (!data) return '대시보드를 찾을 수 없습니다.'
+  if (data.status === 'archived') return '보관된 대시보드에서는 변경할 수 없습니다.'
+  return null
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
@@ -47,10 +57,13 @@ export async function changeTaskStatus(input: {
   const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, title, status, assignee_id')
+    .select('id, title, status, assignee_id, project_id')
     .eq('id', parsed.data.taskId)
     .maybeSingle()
   if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const writeError = await projectWriteError(supabase, task.project_id)
+  if (writeError) return { ok: false, error: writeError }
 
   const reason = parsed.data.reason?.trim() || null
   const toStatus = parsed.data.toStatus as TaskStatus
@@ -81,7 +94,7 @@ export async function changeTaskStatus(input: {
   return { ok: true }
 }
 
-export async function createTask(input: unknown): Promise<ActionResult> {
+export async function createTask(projectId: string, input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
 
@@ -89,9 +102,12 @@ export async function createTask(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
 
   const supabase = createSupabaseDbClient()
+  const writeError = await projectWriteError(supabase, projectId)
+  if (writeError) return { ok: false, error: writeError }
+
   const { data: created, error } = await supabase
     .from('tasks')
-    .insert(toTaskInsert(parsed.data, parsed.data.assigneeId))
+    .insert(toTaskInsert(parsed.data, parsed.data.assigneeId, projectId))
     .select('id')
     .single()
   if (error || !created) return { ok: false, error: '항목 생성에 실패했습니다.' }
@@ -145,7 +161,7 @@ export async function addComment(input: { taskId: string; body: string }): Promi
   return { ok: true }
 }
 
-export async function createTasksFromTemplate(input: {
+export async function createTasksFromTemplate(projectId: string, input: {
   templateId: string
   environment: string
   baseDate: string
@@ -158,6 +174,9 @@ export async function createTasksFromTemplate(input: {
   if (!parsed.data.baseDate) return { ok: false, error: '기준 마감일을 선택해주세요.' }
 
   const supabase = createSupabaseDbClient()
+  const writeError = await projectWriteError(supabase, projectId)
+  if (writeError) return { ok: false, error: writeError }
+
   const { data: items } = await supabase
     .from('template_items')
     .select('*')
@@ -170,6 +189,7 @@ export async function createTasksFromTemplate(input: {
   }
 
   const rows = items.map((item) => ({
+    project_id: projectId,
     title: item.title,
     description: item.description,
     assignee_id: item.default_assignee_id!,
@@ -225,6 +245,83 @@ export async function updateWebhookUrl(url: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { ok } = await writeSetting(supabase, WEBHOOK_SETTING_KEY, trimmed || null)
   if (!ok) return { ok: false, error: '웹훅 URL 저장에 실패했습니다.' }
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+// 새 대시보드(회차)를 만든다. archiveCurrentId 가 있으면 그 회차를 보관 처리한 뒤 새 회차를 연다.
+// 성공 시 새 회차 id 를 함께 돌려줘 클라이언트가 그 대시보드로 이동한다.
+export async function startNewDashboard(input: {
+  name: string
+  archiveCurrentId?: string | null
+}): Promise<ActionResult & { projectId?: string }> {
+  const parsed = projectNameSchema.safeParse(input.name)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+
+  if (input.archiveCurrentId) {
+    const { error: archiveError } = await supabase
+      .from('projects')
+      .update({ status: 'archived', archived_at: new Date().toISOString() })
+      .eq('id', input.archiveCurrentId)
+    if (archiveError) return { ok: false, error: '기존 대시보드 보관에 실패했습니다.' }
+  }
+
+  const { data: created, error } = await supabase
+    .from('projects')
+    .insert({ name: parsed.data, status: 'active' })
+    .select('id')
+    .single()
+  if (error || !created) return { ok: false, error: '대시보드 생성에 실패했습니다.' }
+
+  revalidatePath('/')
+  return { ok: true, projectId: created.id }
+}
+
+// 대시보드 보관/재개 토글.
+export async function setProjectArchived(projectId: string, archived: boolean): Promise<ActionResult> {
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      status: archived ? 'archived' : 'active',
+      archived_at: archived ? new Date().toISOString() : null,
+    })
+    .eq('id', projectId)
+  if (error) return { ok: false, error: '대시보드 상태 변경에 실패했습니다.' }
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+export async function addProjectNote(input: unknown): Promise<ActionResult> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: '프로필 정보를 확인할 수 없습니다.' }
+
+  const parsed = projectNoteSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+
+  const supabase = createSupabaseDbClient()
+  const writeError = await projectWriteError(supabase, parsed.data.projectId)
+  if (writeError) return { ok: false, error: writeError }
+
+  const { error } = await supabase.from('project_notes').insert({
+    project_id: parsed.data.projectId,
+    body: parsed.data.body,
+    author_id: user.id,
+  })
+  if (error) return { ok: false, error: '메모 저장에 실패했습니다.' }
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+export async function deleteProjectNote(noteId: string): Promise<ActionResult> {
+  const supabase = createSupabaseDbClient()
+  const { error } = await supabase.from('project_notes').delete().eq('id', noteId)
+  if (error) return { ok: false, error: '메모 삭제에 실패했습니다.' }
 
   revalidatePath('/')
   return { ok: true }

@@ -1,6 +1,6 @@
-import type { Comment, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
 import { createSupabaseDbClient } from '@/lib/supabase/server'
-import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate, mapSchedulePhase } from '@/lib/db/mappers'
+import { mapUser, mapTask, mapTaskHistory, mapComment, mapTemplate, mapSchedulePhase, mapProject, mapProjectNote } from '@/lib/db/mappers'
 import { readSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
 
 export async function getWebhookUrl(): Promise<string | null> {
@@ -38,6 +38,43 @@ export async function getAllTasks(): Promise<Task[]> {
   const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('tasks').select('*').order('created_at')
   return (data ?? []).map(mapTask)
+}
+
+export async function getTasksForProject(projectId: string): Promise<Task[]> {
+  const supabase = createSupabaseDbClient()
+  const { data } = await supabase.from('tasks').select('*').eq('project_id', projectId).order('created_at')
+  return (data ?? []).map(mapTask)
+}
+
+// 활성 회차를 앞에, 보관 회차를 뒤에 두고 각각 최신순으로 정렬한다.
+export async function getProjects(): Promise<Project[]> {
+  const supabase = createSupabaseDbClient()
+  const { data } = await supabase
+    .from('projects')
+    .select('*')
+    .order('status', { ascending: true }) // active < archived
+    .order('created_at', { ascending: false })
+  return (data ?? []).map(mapProject)
+}
+
+// 현재 보여줄 회차: 요청된 id 가 있으면 그것, 없으면 가장 최근 활성 회차, 그것도 없으면 가장 최근 회차.
+export async function resolveCurrentProject(projectId?: string): Promise<Project | null> {
+  const projects = await getProjects()
+  if (projects.length === 0) return null
+  if (projectId) {
+    const found = projects.find((p) => p.id === projectId)
+    if (found) return found
+  }
+  return projects.find((p) => p.status === 'active') ?? projects[0]
+}
+
+export async function getProjectNotes(projectId: string): Promise<ProjectNote[]> {
+  const supabase = createSupabaseDbClient()
+  const [{ data }, resolveName] = await Promise.all([
+    supabase.from('project_notes').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    buildNameResolver(),
+  ])
+  return (data ?? []).map((row) => mapProjectNote(row, resolveName))
 }
 
 export async function getTasksForAssignee(userId: string): Promise<Task[]> {

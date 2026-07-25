@@ -9,8 +9,28 @@ export interface User {
   role: UserRole
 }
 
+export type ProjectStatus = 'active' | 'archived'
+
+export interface Project {
+  id: string
+  name: string
+  status: ProjectStatus
+  createdAt: string
+  archivedAt: string | null
+}
+
+export interface ProjectNote {
+  id: string
+  projectId: string
+  body: string
+  authorId: string | null
+  authorName: string
+  createdAt: string
+}
+
 export interface Task {
   id: string
+  projectId: string
   title: string
   description: string | null
   assigneeId: string

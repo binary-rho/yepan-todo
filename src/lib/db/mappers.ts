@@ -1,4 +1,4 @@
-import type { Comment, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
+import type { Comment, Project, ProjectNote, SchedulePhase, Task, TaskHistory, Template, User } from '@/types'
 import type { Database } from '@/lib/db/database.types'
 import type { TaskInput } from '@/lib/validation'
 
@@ -8,14 +8,38 @@ type TaskHistoryRow = Database['public']['Tables']['task_history']['Row']
 type CommentRow = Database['public']['Tables']['comments']['Row']
 type TemplateRow = Database['public']['Tables']['templates']['Row']
 type SchedulePhaseRow = Database['public']['Tables']['schedule_phases']['Row']
+type ProjectRow = Database['public']['Tables']['projects']['Row']
+type ProjectNoteRow = Database['public']['Tables']['project_notes']['Row']
 
 export function mapUser(row: UserRow): User {
   return { id: row.id, email: row.email, name: row.name, role: row.role }
 }
 
+export function mapProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status === 'archived' ? 'archived' : 'active',
+    createdAt: row.created_at,
+    archivedAt: row.archived_at,
+  }
+}
+
+export function mapProjectNote(row: ProjectNoteRow, resolveName: (userId: string) => string): ProjectNote {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    body: row.body,
+    authorId: row.author_id,
+    authorName: row.author_id ? resolveName(row.author_id) : '알 수 없음',
+    createdAt: row.created_at,
+  }
+}
+
 export function mapTask(row: TaskRow): Task {
   return {
     id: row.id,
+    projectId: row.project_id,
     title: row.title,
     description: row.description,
     assigneeId: row.assignee_id,
@@ -74,8 +98,9 @@ export function mapSchedulePhase(row: SchedulePhaseRow): SchedulePhase {
   }
 }
 
-export function toTaskInsert(input: TaskInput, assigneeId: string): Database['public']['Tables']['tasks']['Insert'] {
+export function toTaskInsert(input: TaskInput, assigneeId: string, projectId: string): Database['public']['Tables']['tasks']['Insert'] {
   return {
+    project_id: projectId,
     title: input.title,
     description: input.description,
     assignee_id: assigneeId,

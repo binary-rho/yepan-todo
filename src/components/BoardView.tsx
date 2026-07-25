@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Filter, CalendarRange } from 'lucide-react'
-import type { Environment, SchedulePhase, Task, TaskStatus, User } from '@/types'
+import { Plus, FileText, Filter, CalendarRange, MessageSquareText, LayoutDashboard, Lock } from 'lucide-react'
+import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { createTask, changeTaskStatus } from '@/lib/actions'
@@ -13,6 +13,8 @@ import { TaskModal, type TaskFormData } from '@/components/TaskModal'
 import { RejectModal } from '@/components/RejectModal'
 import { WebhookSettingField } from '@/components/WebhookSettingField'
 import { SchedulePhasesModal } from '@/components/SchedulePhasesModal'
+import { NewDashboardModal } from '@/components/NewDashboardModal'
+import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 
 interface BoardViewProps {
   tasks: Task[]
@@ -20,22 +22,57 @@ interface BoardViewProps {
   rejectionReasons: Record<string, string | null>
   webhookUrl: string | null
   phases: SchedulePhase[]
+  projects: Project[]
+  currentProject: Project
+  notes: ProjectNote[]
 }
 
-export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phases }: BoardViewProps) {
+export function BoardView({
+  tasks,
+  userList,
+  rejectionReasons,
+  webhookUrl,
+  phases,
+  projects,
+  currentProject,
+  notes,
+}: BoardViewProps) {
   const router = useRouter()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
   const [blockingOnly, setBlockingOnly] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [newDashboardOpen, setNewDashboardOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [pendingRejectId, setPendingRejectId] = useState<string | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
+  const readOnly = currentProject.status === 'archived'
   const assignees = userList
+
+  const filtered = useMemo(() => tasks.filter(t => {
+    if (envFilter !== 'all' && t.environment !== envFilter) return false
+    if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter) return false
+    if (blockingOnly && !t.isBlocking) return false
+    return true
+  }), [tasks, envFilter, assigneeFilter, blockingOnly])
+
+  const doneCount = tasks.filter(t => t.status === 'done').length
+  const progress = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0
+  const blockingIncomplete = tasks.filter(t => t.isBlocking && t.status !== 'done').length
+
+  async function handleCreate(data: TaskFormData) {
+    const result = await createTask(currentProject.id, data)
+    if (result.ok) {
+      setTaskModalOpen(false)
+      router.refresh()
+    }
+    return result
+  }
 
   function runMove(taskId: string, toStatus: TaskStatus, reason?: string) {
     setMoveError(null)
@@ -51,6 +88,7 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
 
   // 카드를 특정 컬럼(상태)으로 이동. 반려로 옮길 때는 사유 입력 모달을 먼저 띄운다.
   function moveToStatus(taskId: string, toStatus: TaskStatus) {
+    if (readOnly) return
     const task = tasks.find(t => t.id === taskId)
     if (!task || task.status === toStatus) return
     if (!allowedNextStatuses(task.status).includes(toStatus)) return
@@ -69,31 +107,46 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
     if (id) moveToStatus(id, status)
   }
 
-  const filtered = useMemo(() => tasks.filter(t => {
-    if (envFilter !== 'all' && t.environment !== envFilter) return false
-    if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter) return false
-    if (blockingOnly && !t.isBlocking) return false
-    return true
-  }), [tasks, envFilter, assigneeFilter, blockingOnly])
-
-  const doneCount = tasks.filter(t => t.status === 'done').length
-  const progress = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0
-  const blockingIncomplete = tasks.filter(t => t.isBlocking && t.status !== 'done').length
-
-  async function handleCreate(data: TaskFormData) {
-    const result = await createTask(data)
-    if (result.ok) {
-      setTaskModalOpen(false)
-      router.refresh()
-    }
-    return result
+  function handleProjectChange(projectId: string) {
+    router.push(`/?project=${projectId}`)
+    router.refresh()
   }
 
   return (
     <div className="px-6 py-6 flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">보드</h1>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight shrink-0">보드</h1>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <LayoutDashboard size={13} className="text-zinc-400 shrink-0" />
+            <select
+              className="max-w-[220px] px-2 py-1 text-[13px] border border-zinc-200 rounded text-zinc-700 bg-white outline-none focus:border-zinc-400 tracking-tight truncate"
+              value={currentProject.id}
+              onChange={e => handleProjectChange(e.target.value)}
+            >
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.status === 'archived' ? ' (보관)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {readOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border bg-zinc-100 text-zinc-500 border-zinc-200 tracking-tight shrink-0">
+              <Lock size={10} />
+              보관됨 (읽기 전용)
+            </span>
+          )}
+        </div>
         <div className="flex gap-2">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            onClick={() => setNotesOpen(true)}
+          >
+            <MessageSquareText size={13} />
+            메모
+            {notes.length > 0 && <span className="tabular-nums text-zinc-400">{notes.length}</span>}
+          </button>
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
             onClick={() => setScheduleModalOpen(true)}
@@ -109,12 +162,21 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
             템플릿
           </button>
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight"
-            onClick={() => setTaskModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight"
+            onClick={() => setNewDashboardOpen(true)}
           >
-            <Plus size={13} />
-            새 항목
+            <LayoutDashboard size={13} />
+            새 대시보드
           </button>
+          {!readOnly && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight"
+              onClick={() => setTaskModalOpen(true)}
+            >
+              <Plus size={13} />
+              새 항목
+            </button>
+          )}
         </div>
       </div>
 
@@ -178,12 +240,12 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
       <div className="flex gap-3 overflow-x-auto pb-2 flex-1" style={{ minHeight: 0 }}>
         {KANBAN_COLUMNS.map(status => {
           const colTasks = filtered.filter(t => t.status === status)
-          const isDropTarget = dragOverStatus === status
+          const isDropTarget = !readOnly && dragOverStatus === status
           return (
             <div
               key={status}
               className="shrink-0 w-60"
-              onDragOver={e => { e.preventDefault(); setDragOverStatus(status) }}
+              onDragOver={e => { if (readOnly) return; e.preventDefault(); setDragOverStatus(status) }}
               onDragLeave={e => { if (e.currentTarget === e.target) setDragOverStatus(null) }}
               onDrop={e => handleDrop(status, e)}
             >
@@ -206,7 +268,7 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
                       showAssignee
                       compact
                       rejectionReason={rejectionReasons[task.id] ?? null}
-                      draggable
+                      draggable={!readOnly}
                       dragging={draggingId === task.id}
                       onDragStart={e => {
                         setDraggingId(task.id)
@@ -247,6 +309,22 @@ export function BoardView({ tasks, userList, rejectionReasons, webhookUrl, phase
             setScheduleModalOpen(false)
             router.refresh()
           }}
+        />
+      )}
+
+      {newDashboardOpen && (
+        <NewDashboardModal
+          currentProject={currentProject}
+          onClose={() => setNewDashboardOpen(false)}
+        />
+      )}
+
+      {notesOpen && (
+        <ProjectNotesPanel
+          projectId={currentProject.id}
+          notes={notes}
+          readOnly={readOnly}
+          onClose={() => setNotesOpen(false)}
         />
       )}
 

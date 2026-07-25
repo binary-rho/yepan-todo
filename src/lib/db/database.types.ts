@@ -40,6 +40,7 @@ export interface Database {
       tasks: {
         Row: {
           id: string
+          project_id: string
           title: string
           description: string | null
           assignee_id: string
@@ -56,6 +57,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          project_id: string
           title: string
           description?: string | null
           assignee_id: string
@@ -72,6 +74,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          project_id?: string
           title?: string
           description?: string | null
           assignee_id?: string
@@ -85,6 +88,54 @@ export interface Database {
           screenshot_url?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          id: string
+          name: string
+          status: string
+          created_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          status?: string
+          created_at?: string
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          status?: string
+          created_at?: string
+          archived_at?: string | null
+        }
+        Relationships: []
+      }
+      project_notes: {
+        Row: {
+          id: string
+          project_id: string
+          body: string
+          author_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          body: string
+          author_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          body?: string
+          author_id?: string | null
+          created_at?: string
         }
         Relationships: []
       }

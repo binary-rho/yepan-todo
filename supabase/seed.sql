@@ -11,15 +11,25 @@ values
   ('33333333-3333-3333-3333-333333333333', 'seoyeon.lee@telecom.co.kr', '이서연', 'assignee', null)
 on conflict (id) do nothing;
 
--- ─── Tasks (5건) ──────────────────────────────────────────────────────────────
-insert into public.tasks (id, title, description, assignee_id, status, environment, due_date, is_blocking, confluence_url, verify_url, verify_point)
-values
-  ('aaaaaaa1-0000-0000-0000-000000000001', '요금제 노출 순서 설정', 'PRD 메인 요금제 목록 노출 순서를 변경합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'prd', '2026-07-15', true, 'https://confluence.example.com/pages/1001', 'https://admin.prd.telecom.co.kr/plans/order', '요금제 목록에서 5G Ultimate 요금제가 1번 위치인지 확인'),
-  ('aaaaaaa1-0000-0000-0000-000000000002', '가입 가능 연령 제한 값 등록', '청소년 요금제 최대 연령을 18세로 변경합니다.', '33333333-3333-3333-3333-333333333333', 'todo', 'stg', '2026-07-18', true, 'https://confluence.example.com/pages/1002', 'https://admin.stg.telecom.co.kr/plans/youth/age-limit', '최대 연령이 18세로 표시되는지 확인'),
-  ('aaaaaaa1-0000-0000-0000-000000000003', '프로모션 배너 노출 기간 설정', '여름 특가 배너 노출 시작/종료일을 설정합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'dev', '2026-07-25', false, null, null, null),
-  ('aaaaaaa1-0000-0000-0000-000000000004', '데이터 이월 정책 플래그 변경', '잔여 데이터 이월 기능 플래그를 활성화합니다.', '33333333-3333-3333-3333-333333333333', 'done', 'prd', null, false, 'https://confluence.example.com/pages/1013', 'https://admin.prd.telecom.co.kr/data/rollover-flag', '플래그 상태가 활성화(true)인지 확인'),
-  ('aaaaaaa1-0000-0000-0000-000000000005', '5G 전용 혜택 대상 단말 목록 업데이트', '신규 5G 단말 3종을 대상 목록에 추가합니다.', '22222222-2222-2222-2222-222222222222', 'rejected', 'prd', '2026-08-15', false, 'https://confluence.example.com/pages/1017', null, null)
+-- ─── 대시보드(회차) ───────────────────────────────────────────────────────────
+insert into public.projects (id, name, status)
+values ('cccccccc-0000-0000-0000-000000000001', '기본 대시보드', 'active')
 on conflict (id) do nothing;
+
+-- ─── Tasks (5건) ──────────────────────────────────────────────────────────────
+insert into public.tasks (id, project_id, title, description, assignee_id, status, environment, due_date, is_blocking, confluence_url, verify_url, verify_point)
+values
+  ('aaaaaaa1-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000001', '요금제 노출 순서 설정', 'PRD 메인 요금제 목록 노출 순서를 변경합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'prd', '2026-07-15', true, 'https://confluence.example.com/pages/1001', 'https://admin.prd.telecom.co.kr/plans/order', '요금제 목록에서 5G Ultimate 요금제가 1번 위치인지 확인'),
+  ('aaaaaaa1-0000-0000-0000-000000000002', 'cccccccc-0000-0000-0000-000000000001', '가입 가능 연령 제한 값 등록', '청소년 요금제 최대 연령을 18세로 변경합니다.', '33333333-3333-3333-3333-333333333333', 'todo', 'stg', '2026-07-18', true, 'https://confluence.example.com/pages/1002', 'https://admin.stg.telecom.co.kr/plans/youth/age-limit', '최대 연령이 18세로 표시되는지 확인'),
+  ('aaaaaaa1-0000-0000-0000-000000000003', 'cccccccc-0000-0000-0000-000000000001', '프로모션 배너 노출 기간 설정', '여름 특가 배너 노출 시작/종료일을 설정합니다.', '22222222-2222-2222-2222-222222222222', 'todo', 'dev', '2026-07-25', false, null, null, null),
+  ('aaaaaaa1-0000-0000-0000-000000000004', 'cccccccc-0000-0000-0000-000000000001', '데이터 이월 정책 플래그 변경', '잔여 데이터 이월 기능 플래그를 활성화합니다.', '33333333-3333-3333-3333-333333333333', 'done', 'prd', null, false, 'https://confluence.example.com/pages/1013', 'https://admin.prd.telecom.co.kr/data/rollover-flag', '플래그 상태가 활성화(true)인지 확인'),
+  ('aaaaaaa1-0000-0000-0000-000000000005', 'cccccccc-0000-0000-0000-000000000001', '5G 전용 혜택 대상 단말 목록 업데이트', '신규 5G 단말 3종을 대상 목록에 추가합니다.', '22222222-2222-2222-2222-222222222222', 'rejected', 'prd', '2026-08-15', false, 'https://confluence.example.com/pages/1017', null, null)
+on conflict (id) do nothing;
+
+-- 프로젝트 메모(이슈 로그) 샘플
+insert into public.project_notes (project_id, body, author_id)
+values ('cccccccc-0000-0000-0000-000000000001', '36개월 할부 결제 오류 — 월요일부터 열리도록 토스와 협의되어 있었음(사업 미공유). 오류 아님.', '11111111-1111-1111-1111-111111111111')
+on conflict do nothing;
 
 -- 최소 이력 (rejected 사유 노출 확인용)
 insert into public.task_history (task_id, from_status, to_status, changed_by, reason, created_at)

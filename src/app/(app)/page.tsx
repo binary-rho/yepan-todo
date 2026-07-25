@@ -1,21 +1,40 @@
 import {
-  getAllTasks,
+  getTasksForProject,
   getUsers,
   getLatestRejectionReasons,
   getWebhookUrl,
   getSchedulePhases,
+  getProjects,
+  resolveCurrentProject,
+  getProjectNotes,
 } from '@/lib/db/queries'
 import { BoardView } from '@/components/BoardView'
+import { EmptyBoard } from '@/components/EmptyBoard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BoardPage() {
-  const [tasks, users, rejectionReasons, webhookUrl, phases] = await Promise.all([
-    getAllTasks(),
+export default async function BoardPage({
+  searchParams,
+}: {
+  searchParams: { project?: string }
+}) {
+  const [projects, currentProject] = await Promise.all([
+    getProjects(),
+    resolveCurrentProject(searchParams.project),
+  ])
+
+  // 회차가 하나도 없으면 첫 대시보드 생성 화면을 보여준다. (마이그레이션 미실행 등)
+  if (!currentProject) {
+    return <EmptyBoard />
+  }
+
+  const [tasks, users, rejectionReasons, webhookUrl, phases, notes] = await Promise.all([
+    getTasksForProject(currentProject.id),
     getUsers(),
     getLatestRejectionReasons(),
     getWebhookUrl(),
     getSchedulePhases(),
+    getProjectNotes(currentProject.id),
   ])
 
   return (
@@ -25,6 +44,9 @@ export default async function BoardPage() {
       rejectionReasons={rejectionReasons}
       webhookUrl={webhookUrl}
       phases={phases}
+      projects={projects}
+      currentProject={currentProject}
+      notes={notes}
     />
   )
 }

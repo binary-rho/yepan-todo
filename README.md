@@ -76,7 +76,7 @@ supabase db reset
 2. 설정 > API 에서 `Project URL`, `anon public`, `service_role` 키를 복사해 `.env.local`(및 Vercel 환경 변수)에 넣는다.
 3. 마이그레이션 적용:
    - CLI: `supabase link --project-ref <ref>` 후 `supabase db push`
-   - 또는 대시보드 SQL Editor 에서 `supabase/migrations/` 의 `0001_init.sql` → `0002_storage.sql` → `0003_app_settings.sql` → `0004_schedule.sql` → `0005_no_login_and_statuses.sql` 을 순서대로 실행.
+   - 또는 대시보드 SQL Editor 에서 `supabase/migrations/` 의 `0001_init.sql` → `0002_storage.sql` → `0003_app_settings.sql` → `0004_schedule.sql` → `0005_no_login_and_statuses.sql` → `0006_projects.sql` 을 순서대로 실행.
 4. 샘플 데이터가 필요하면 SQL Editor 에서 `supabase/seed.sql` 을 실행한다. (운영에서는 생략 가능)
    - 로그인이 없으므로 별도 Auth 설정은 필요 없다. 앱은 `users` 의 운영자 프로필 행 하나를 "현재 사용자"로 사용한다(0005·seed 가 보장).
 
