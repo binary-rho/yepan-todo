@@ -172,9 +172,29 @@ supabase db reset
 - **즉시 발송**: 항목 생성/담당자 배정(담당자에게), 재설정 필요(담당자에게, 사유 포함). 담당자가 없는 항목은 배정 알림을 보내지 않고, 보드/상세의 "알림" 버튼으로만 사람 태그 없이 채널에 알린다.
 - **일괄 발송(크론, 하루 1회)**: 담당자당 한 건으로 합친 다이제스트(미완료 요약 + 오늘/2일 후 마감 + 마감 초과). 마감 초과는 관리자에게도 통지.
 - 모든 메시지에 항목의 `/tasks/[id]` 절대 경로 링크가 포함된다.
-- 웹훅 URL 은 **보드(`/`) 상단 "알림 웹훅 URL" 필드**에서 입력하며 `app_settings` 테이블에 저장된다(자주 바뀌는 값이라 화면에서 관리). **URL 이 설정되지 않으면 알림을 발송하지 않는다.** 웹훅 페이로드는 `{ text: string }` 이며, 스펙이 확정되면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
-- Teams 웹훅은 채널 → **Workflows** → "Post to a channel when a webhook request is received" 템플릿으로 URL 을 발급받는다(구 Incoming Webhook 커넥터는 폐기됨).
+- 웹훅 URL 은 **보드(`/`) 상단 "알림 웹훅 URL" 필드**에서 입력하며 `app_settings` 테이블에 저장된다(자주 바뀌는 값이라 화면에서 관리). **URL 이 설정되지 않으면 알림을 발송하지 않는다.**
+- 페이로드는 항상 **Teams Adaptive Card**(`{ type: "message", attachments: [...] }`)다. Workflows 웹훅은 레거시 커넥터 형식(`{ text }`)을 받으면 엔드포인트에서 `202` 를 주면서도 흐름 안에서 카드 검증에 실패해 채널에 아무것도 올라가지 않는다. 스펙이 바뀌면 `src/lib/notifications/transport.ts` 한 곳만 고치면 된다.
+- 전송 실패(URL 오류·권한·레이트리밋)는 응답 상태 코드로 감지해 "알림" 버튼 화면에 상태 코드까지 표시한다. 다만 **흐름 내부 실패는 엔드포인트가 `202` 를 주므로 감지할 수 없다** — 이때는 Power Automate 의 해당 흐름 → 실행 기록을 확인한다.
 - 중복 발송은 `notification_log.dedupe_key` 로 차단한다.
+
+### 웹훅 URL 발급 (Teams Workflows)
+
+구 Incoming Webhook 커넥터는 폐기됐으므로 Workflows(Power Automate)로 발급한다.
+
+1. Teams 에서 알림 받을 **채널 → ⋯ → 워크플로(Workflows)**.
+2. 템플릿 **"웹훅 요청을 받으면 채널에 게시"**(Post to a channel when a webhook request is received) 선택.
+3. Teams 연결 확인 → **다음** → 팀·채널 선택 → **흐름 만들기**.
+4. 표시되는 **HTTP POST URL**(`https://prod-*.logic.azure.com/...`)을 복사해 보드 상단 필드에 저장.
+
+URL 을 다시 확인하려면 [Power Automate](https://make.powerautomate.com) → 내 흐름 → 편집 → 트리거 `When a Teams webhook request is received` 를 펼친다. URL 은 인증이 없는 비밀값이라 유출되면 누구나 그 채널에 글을 쓸 수 있고, 회수하려면 트리거를 다시 만들어 URL 을 새로 발급해야 한다. 흐름은 만든 사람 계정에 묶이므로(게시자가 "이름 via Workflows") 그 계정이 빠지면 멈춘다 — 팀원과 공동 소유로 공유해 두는 편이 안전하다.
+
+### @태그(멘션)가 걸리는 조건
+
+`src/lib/notifications/transport.ts` 가 본문에 `<at>이름</at>` 을 넣고 `msteams.entities` 에 같은 문자열을 매핑한다. 다음 조건이 어긋나면 **에러 없이 태그만 빠지고 이름이 텍스트로 보인다.**
+
+- `mentioned.id` 로 멤버의 **이메일**을 쓴다. 이 값이 실제 Teams 계정 이메일(UPN)과 같아야 한다.
+- 태그 대상이 그 팀·채널의 멤버여야 한다.
+- `@channel`·`@team` 전체 멘션은 웹훅으로 불가능하다(봇 계정만 가능).
 
 ---
 

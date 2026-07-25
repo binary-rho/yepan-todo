@@ -22,7 +22,8 @@ export async function safeSend(text: string): Promise<void> {
   }
 }
 
-export type SendResult = { ok: true } | { ok: false; reason: 'no_webhook' | 'failed' }
+// 실패 사유를 추측해서 안내하지 않도록, 전송부가 알려준 원문(상태 코드 등)을 detail 로 함께 올린다.
+export type SendResult = { ok: true } | { ok: false; reason: 'no_webhook' } | { ok: false; reason: 'failed'; detail: string | null }
 
 // 담당자가 없는 항목도 알림을 보낼 수 있다. 이때는 부를 사람이 없으니 태그 없이 채널에만 알린다.
 const UNASSIGNED_LABEL = '미지정'
@@ -54,7 +55,7 @@ export async function sendManualCall(p: ManualCall): Promise<SendResult> {
     return { ok: true }
   } catch (e) {
     console.error('[notification] 수동 호출 실패', e)
-    return { ok: false, reason: 'failed' }
+    return { ok: false, reason: 'failed', detail: e instanceof Error ? e.message : null }
   }
 }
 

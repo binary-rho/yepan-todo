@@ -161,13 +161,12 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
     mention,
   })
   if (!result.ok) {
-    return {
-      ok: false,
-      error:
-        result.reason === 'no_webhook'
-          ? '알림 웹훅이 설정되지 않았습니다. 보드 상단에서 URL을 입력해주세요.'
-          : '알림 발송에 실패했습니다.',
+    if (result.reason === 'no_webhook') {
+      return { ok: false, error: '알림 웹훅이 설정되지 않았습니다. 보드 상단에서 URL을 입력해주세요.' }
     }
+    // 원인을 추측해 안내하면 URL 오류인지 권한 문제인지 구분이 안 되므로 응답 내용을 그대로 덧붙인다.
+    const detail = result.detail ? ` (${result.detail})` : ''
+    return { ok: false, error: `알림 발송에 실패했습니다.${detail}` }
   }
   return { ok: true }
 }
