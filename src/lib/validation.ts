@@ -70,6 +70,9 @@ export const memberInputSchema = z.object({
 })
 export type MemberInput = z.infer<typeof memberInputSchema>
 
+// 브라우저에 저장하는 "현재 사용자"(본인 정보). 회차 멤버와 이메일로 매칭되므로 멤버 입력과 같은 규칙을 쓴다.
+export const identityInputSchema = memberInputSchema.omit({ teamRole: true })
+
 export const memberImportItemSchema = z.object({
   name: z.string().trim().min(1),
   email: emailSchema,

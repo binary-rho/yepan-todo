@@ -20,8 +20,3 @@ export const KANBAN_COLUMNS: TaskStatus[] = ['todo', 'done', 'rejected']
 
 // 담당자 직군 라벨 선택지. 기본값은 미정(null)이다.
 export const TEAM_ROLES: TeamRole[] = ['사업', '기획', 'TPM', 'FE', 'BE']
-
-// 브라우저에서 아직 아무도 "현재 사용자"를 선택하지 않았을 때 쓰는 플레이스홀더 멤버 id.
-// 실제 팀원 중 아무나(알파벳/가나다순 첫 멤버)로 오인 귀속되는 걸 막기 위해 둔다.
-// 마이그레이션 0012 가 이 id 로 '홍길동' 멤버 존재를 보장한다. 멤버 관리에서 지워도 무방하다(그 경우 선택을 요구한다).
-export const DEFAULT_MEMBER_ID = '11111111-1111-1111-1111-111111111111'

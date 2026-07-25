@@ -7,8 +7,9 @@ import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from
 import { formatDateTime } from '@/lib/date'
 import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
-import { useCurrentUser } from '@/components/CurrentUserProvider'
-import { CurrentUserPicker } from '@/components/CurrentUserPicker'
+import { useProjectMember } from '@/components/ProjectMemberProvider'
+import { ProjectMembersButton } from '@/components/ProjectMembersButton'
+import { MembershipAlert } from '@/components/MembershipAlert'
 import { StatusBadge, EnvBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
@@ -35,7 +36,7 @@ const STATUS_ACTION: Record<TaskStatus, { label: string; cls: string }> = {
 
 export function TaskDetailView({ task, userList, comments, histories, screenshotUrl, phases, readOnly }: TaskDetailViewProps) {
   const router = useRouter()
-  const { currentUser } = useCurrentUser()
+  const { currentUser } = useProjectMember()
   const [commentText, setCommentText] = useState('')
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -51,7 +52,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
 
   function runStatusChange(newStatus: TaskStatus, reason?: string) {
     if (!currentUser) {
-      setActionError('작업할 사용자를 먼저 선택해주세요.')
+      setActionError('좌측에서 내 정보를 먼저 입력해주세요.')
       return
     }
     setActionError(null)
@@ -68,7 +69,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   function submitComment() {
     if (!commentText.trim()) return
     if (!currentUser) {
-      setActionError('작업할 사용자를 먼저 선택해주세요.')
+      setActionError('좌측에서 내 정보를 먼저 입력해주세요.')
       return
     }
     setActionError(null)
@@ -103,9 +104,10 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   return (
     <div className="px-6 py-6">
       <div className="flex items-center justify-between mb-4">
+        {/* 보관된 회차의 항목이면 활성 회차가 아니라 원래 보고 있던 그 회차로 돌아가야 한다. */}
         <button
           className="flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-700 tracking-tight transition-colors"
-          onClick={() => router.push('/')}
+          onClick={() => router.push(`/?project=${task.projectId}`)}
         >
           <ChevronRight size={13} className="rotate-180" />
           목록으로
@@ -116,9 +118,11 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
             보관됨 (읽기 전용)
           </span>
         ) : (
-          <CurrentUserPicker />
+          <ProjectMembersButton />
         )}
       </div>
+
+      {!readOnly && <MembershipAlert />}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4 min-w-0">

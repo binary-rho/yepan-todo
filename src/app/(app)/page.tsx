@@ -6,10 +6,11 @@ import {
   getSchedulePhases,
   resolveCurrentProject,
   getProjectNotes,
+  getTemplatesWithItems,
 } from '@/lib/db/queries'
 import { BoardView } from '@/components/BoardView'
 import { EmptyBoard } from '@/components/EmptyBoard'
-import { CurrentUserProvider } from '@/components/CurrentUserProvider'
+import { ProjectMemberProvider } from '@/components/ProjectMemberProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,17 +26,18 @@ export default async function BoardPage({
     return <EmptyBoard />
   }
 
-  const [tasks, users, rejectionReasons, webhookUrl, phases, notes] = await Promise.all([
+  const [tasks, users, rejectionReasons, webhookUrl, phases, notes, templateData] = await Promise.all([
     getTasksForProject(currentProject.id),
     getUsersForProject(currentProject.id),
     getLatestRejectionReasons(),
     getWebhookUrl(),
     getSchedulePhases(),
     getProjectNotes(currentProject.id),
+    getTemplatesWithItems(),
   ])
 
   return (
-    <CurrentUserProvider projectId={currentProject.id} members={users}>
+    <ProjectMemberProvider projectId={currentProject.id} members={users}>
       <BoardView
         tasks={tasks}
         userList={users}
@@ -44,7 +46,9 @@ export default async function BoardPage({
         phases={phases}
         currentProject={currentProject}
         notes={notes}
+        templates={templateData.templates}
+        itemsByTemplate={templateData.itemsByTemplate}
       />
-    </CurrentUserProvider>
+    </ProjectMemberProvider>
   )
 }

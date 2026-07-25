@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { CurrentIdentityField } from '@/components/CurrentIdentityField'
 
 const NAV_ITEMS = [
   { label: '보드', href: '/' },
@@ -9,8 +10,8 @@ const NAV_ITEMS = [
   { label: '보관함', href: '/archive' },
 ] as const
 
-// "현재 사용자" 선택과 멤버 관리는 회차(프로젝트)에 귀속된 정보라 이 전역 메뉴가 아니라
-// 각 프로젝트 화면(보드 등)의 헤더에 있다. (CurrentUserPicker 참고)
+// "현재 사용자"는 회차를 옮겨도 유지되는 브라우저 설정이라 항상 보이는 이 자리에 둔다.
+// 회차별 멤버 목록 관리는 프로젝트 화면 헤더에 있다. (ProjectMembersButton 참고)
 export function Nav() {
   const pathname = usePathname()
 
@@ -40,6 +41,8 @@ export function Nav() {
           </Link>
         ))}
       </nav>
+
+      <CurrentIdentityField />
     </aside>
   )
 }

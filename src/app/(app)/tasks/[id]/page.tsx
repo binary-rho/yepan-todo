@@ -9,7 +9,7 @@ import {
 } from '@/lib/db/queries'
 import { getScreenshotSignedUrl } from '@/lib/storage'
 import { TaskDetailView } from '@/components/TaskDetailView'
-import { CurrentUserProvider } from '@/components/CurrentUserProvider'
+import { ProjectMemberProvider } from '@/components/ProjectMemberProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   const readOnly = project?.status === 'archived'
 
   return (
-    <CurrentUserProvider projectId={task.projectId} members={users}>
+    <ProjectMemberProvider projectId={task.projectId} members={users}>
       <TaskDetailView
         task={task}
         userList={users}
@@ -38,6 +38,6 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
         phases={phases}
         readOnly={readOnly}
       />
-    </CurrentUserProvider>
+    </ProjectMemberProvider>
   )
 }

@@ -3,12 +3,13 @@
 import { useMemo, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, FileText, Filter, CalendarRange, LayoutDashboard, Lock } from 'lucide-react'
-import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, User } from '@/types'
+import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, Template, TemplateItem, User } from '@/types'
 import { KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
-import { useCurrentUser } from '@/components/CurrentUserProvider'
-import { CurrentUserPicker } from '@/components/CurrentUserPicker'
+import { useProjectMember } from '@/components/ProjectMemberProvider'
+import { ProjectMembersButton } from '@/components/ProjectMembersButton'
+import { MembershipAlert } from '@/components/MembershipAlert'
 import { StatusBadge } from '@/components/badges'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
@@ -16,6 +17,7 @@ import { RejectModal } from '@/components/RejectModal'
 import { WebhookSettingField } from '@/components/WebhookSettingField'
 import { SchedulePhasesModal } from '@/components/SchedulePhasesModal'
 import { NewDashboardModal } from '@/components/NewDashboardModal'
+import { TemplatePickerModal } from '@/components/TemplatePickerModal'
 import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 
 // 카드가 눌려서 찌그러지지 않도록 컬럼 폭을 고정한다. 화면이 좁으면(축소가 아니라) 가로 스크롤이 생긴다.
@@ -29,6 +31,8 @@ interface BoardViewProps {
   phases: SchedulePhase[]
   currentProject: Project
   notes: ProjectNote[]
+  templates: Template[]
+  itemsByTemplate: Record<string, TemplateItem[]>
 }
 
 export function BoardView({
@@ -39,13 +43,16 @@ export function BoardView({
   phases,
   currentProject,
   notes,
+  templates,
+  itemsByTemplate,
 }: BoardViewProps) {
   const router = useRouter()
-  const { currentUser } = useCurrentUser()
+  const { currentUser } = useProjectMember()
   const [envFilter, setEnvFilter] = useState<'all' | Environment>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | string>('all')
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [newDashboardOpen, setNewDashboardOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
@@ -66,7 +73,7 @@ export function BoardView({
   const progress = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0
 
   async function handleCreate(data: TaskFormData) {
-    if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
+    if (!currentUser) return { ok: false as const, error: '좌측에서 내 정보를 먼저 입력해주세요.' }
     const result = await createTask(currentProject.id, data, currentUser.id)
     if (result.ok) {
       setTaskModalOpen(false)
@@ -77,7 +84,7 @@ export function BoardView({
 
   function runMove(taskId: string, toStatus: TaskStatus, reason?: string) {
     if (!currentUser) {
-      setMoveError('작업할 사용자를 먼저 선택해주세요.')
+      setMoveError('좌측에서 내 정보를 먼저 입력해주세요.')
       return
     }
     setMoveError(null)
@@ -138,7 +145,7 @@ export function BoardView({
           )}
         </div>
         <div className="flex gap-2 shrink-0">
-          {!readOnly && <CurrentUserPicker />}
+          {!readOnly && <ProjectMembersButton />}
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setScheduleModalOpen(true)}
@@ -146,13 +153,17 @@ export function BoardView({
             <CalendarRange size={13} className="shrink-0" />
             일정
           </button>
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
-            onClick={() => router.push('/templates')}
-          >
-            <FileText size={13} className="shrink-0" />
-            템플릿
-          </button>
+          {!readOnly && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap disabled:opacity-40"
+              onClick={() => setTemplatePickerOpen(true)}
+              disabled={!currentUser}
+              title={!currentUser ? '좌측에서 내 정보를 먼저 입력해주세요' : undefined}
+            >
+              <FileText size={13} className="shrink-0" />
+              템플릿
+            </button>
+          )}
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setNewDashboardOpen(true)}
@@ -165,7 +176,7 @@ export function BoardView({
               className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40 shrink-0 whitespace-nowrap"
               onClick={() => setTaskModalOpen(true)}
               disabled={!currentUser}
-              title={!currentUser ? '작업할 사용자를 먼저 선택해주세요' : undefined}
+              title={!currentUser ? '좌측에서 내 정보를 먼저 입력해주세요' : undefined}
             >
               <Plus size={13} className="shrink-0" />
               새 항목
@@ -173,6 +184,8 @@ export function BoardView({
           )}
         </div>
       </div>
+
+      {!readOnly && <MembershipAlert />}
 
       <WebhookSettingField initialUrl={webhookUrl} />
 
@@ -296,6 +309,18 @@ export function BoardView({
           onClose={() => setScheduleModalOpen(false)}
           onSaved={() => {
             setScheduleModalOpen(false)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {templatePickerOpen && (
+        <TemplatePickerModal
+          templates={templates}
+          itemsByTemplate={itemsByTemplate}
+          onClose={() => setTemplatePickerOpen(false)}
+          onCreated={() => {
+            setTemplatePickerOpen(false)
             router.refresh()
           }}
         />

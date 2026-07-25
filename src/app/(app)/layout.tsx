@@ -1,12 +1,15 @@
 import { Nav } from '@/components/Nav'
+import { CurrentIdentityProvider } from '@/components/CurrentIdentityProvider'
 
-// 멤버(현재 사용자 선택/멤버 관리)는 이제 회차(프로젝트)에 귀속되므로 전역 레이아웃이 아니라
-// 각 프로젝트 화면(보드/템플릿/항목 상세)에서 그 회차의 멤버만 다룬다. (CurrentUserProvider 참고)
+// "현재 사용자"는 회차와 무관한 브라우저 설정(본인이 직접 입력)이라 전역 레이아웃에서 관리한다.
+// 회차별 멤버 목록/멤버 관리는 각 프로젝트 화면에서 다룬다. (ProjectMemberProvider 참고)
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-background font-[Pretendard,system-ui,sans-serif]">
-      <Nav />
-      <main className="flex-1 overflow-auto min-w-0">{children}</main>
-    </div>
+    <CurrentIdentityProvider>
+      <div className="flex min-h-screen bg-background font-[Pretendard,system-ui,sans-serif]">
+        <Nav />
+        <main className="flex-1 overflow-auto min-w-0">{children}</main>
+      </div>
+    </CurrentIdentityProvider>
   )
 }

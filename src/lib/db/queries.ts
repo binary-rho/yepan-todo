@@ -139,6 +139,27 @@ export async function getTemplateItems(templateId: string): Promise<TemplateItem
   return (data ?? []).map(mapTemplateItem)
 }
 
+// 템플릿 목록과 각 템플릿의 항목을 한 번에 읽는다. 보드의 "템플릿으로 생성" 팝업과 템플릿 관리 화면이
+// 같은 데이터를 쓰므로, 템플릿마다 쿼리를 날리지 않고 항목을 한 번에 가져와 묶는다.
+export async function getTemplatesWithItems(): Promise<{
+  templates: Template[]
+  itemsByTemplate: Record<string, TemplateItem[]>
+}> {
+  const supabase = createSupabaseDbClient()
+  const [templates, { data: itemRows }] = await Promise.all([
+    getTemplates(),
+    supabase.from('template_items').select('*').order('title'),
+  ])
+
+  const itemsByTemplate: Record<string, TemplateItem[]> = Object.fromEntries(
+    templates.map((template) => [template.id, []]),
+  )
+  for (const row of itemRows ?? []) {
+    itemsByTemplate[row.template_id]?.push(mapTemplateItem(row))
+  }
+  return { templates, itemsByTemplate }
+}
+
 export async function getLatestRejectionReasons(): Promise<Record<string, string | null>> {
   const supabase = createSupabaseDbClient()
   const { data } = await supabase

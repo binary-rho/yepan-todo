@@ -7,8 +7,9 @@ import type { Environment, Template, TemplateItem, User } from '@/types'
 import { createTasksFromTemplate, deleteTemplate } from '@/lib/actions'
 import { TemplateUseModal } from '@/components/TemplateUseModal'
 import { TemplateEditorModal } from '@/components/TemplateEditorModal'
-import { useCurrentUser } from '@/components/CurrentUserProvider'
-import { CurrentUserPicker } from '@/components/CurrentUserPicker'
+import { useProjectMember } from '@/components/ProjectMemberProvider'
+import { ProjectMembersButton } from '@/components/ProjectMembersButton'
+import { MembershipAlert } from '@/components/MembershipAlert'
 
 interface TemplatesViewProps {
   templateList: Template[]
@@ -21,7 +22,7 @@ type EditorState = { mode: 'create' } | { mode: 'edit'; template: Template }
 
 export function TemplatesView({ templateList, itemsByTemplate, members, activeProject }: TemplatesViewProps) {
   const router = useRouter()
-  const { currentUser } = useCurrentUser()
+  const { currentUser } = useProjectMember()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [useModal, setUseModal] = useState<Template | null>(null)
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -29,7 +30,7 @@ export function TemplatesView({ templateList, itemsByTemplate, members, activePr
 
   async function handleConfirm(templateId: string, env: Environment, baseDate: string, assigneeByItemId: Record<string, string>) {
     if (!activeProject) return { ok: false as const, error: '활성 대시보드가 없습니다. 보드에서 새 대시보드를 먼저 만들어주세요.' }
-    if (!currentUser) return { ok: false as const, error: '작업할 사용자를 먼저 선택해주세요.' }
+    if (!currentUser) return { ok: false as const, error: '좌측에서 내 정보를 먼저 입력해주세요.' }
     const result = await createTasksFromTemplate(activeProject.id, { templateId, environment: env, baseDate, assigneeByItemId }, currentUser.id)
     if (result.ok) {
       setUseModal(null)
@@ -58,7 +59,7 @@ export function TemplatesView({ templateList, itemsByTemplate, members, activePr
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {activeProject && <CurrentUserPicker />}
+          {activeProject && <ProjectMembersButton />}
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight shrink-0 whitespace-nowrap"
             onClick={() => setEditor({ mode: 'create' })}
@@ -68,6 +69,8 @@ export function TemplatesView({ templateList, itemsByTemplate, members, activePr
           </button>
         </div>
       </div>
+
+      <div className="max-w-xl">{activeProject && <MembershipAlert />}</div>
 
       <div className="space-y-3 max-w-xl">
         {templateList.length === 0 && (
@@ -116,7 +119,7 @@ export function TemplatesView({ templateList, itemsByTemplate, members, activePr
                       className="px-3 py-1.5 text-[12px] bg-zinc-900 text-white rounded hover:bg-zinc-700 transition-colors tracking-tight disabled:opacity-40"
                       onClick={() => setUseModal(tpl)}
                       disabled={!activeProject || items.length === 0 || !currentUser}
-                      title={!activeProject ? '활성 대시보드가 없습니다' : !currentUser ? '작업할 사용자를 먼저 선택해주세요' : undefined}
+                      title={!activeProject ? '활성 대시보드가 없습니다' : !currentUser ? '좌측에서 내 정보를 먼저 입력해주세요' : undefined}
                     >
                       이 템플릿으로 생성
                     </button>
