@@ -1,11 +1,11 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, RotateCcw, ListChecks } from 'lucide-react'
+import { Archive, Trash2, ListChecks } from 'lucide-react'
 import type { Project } from '@/types'
 import { formatDate } from '@/lib/date'
-import { setProjectArchived } from '@/lib/actions'
+import { deleteProject } from '@/lib/actions'
 
 interface ArchiveViewProps {
   projects: Project[]
@@ -14,12 +14,19 @@ interface ArchiveViewProps {
 
 export function ArchiveView({ projects, taskCounts }: ArchiveViewProps) {
   const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  function reopen(projectId: string) {
+  function remove(project: Project) {
+    if (!confirm(`'${project.name}' 대시보드를 삭제할까요? 소속된 항목·코멘트·메모가 모두 함께 삭제되며 되돌릴 수 없습니다.`)) return
+    setError(null)
     startTransition(async () => {
-      const result = await setProjectArchived(projectId, false)
-      if (result.ok) router.refresh()
+      const result = await deleteProject(project.id)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      router.refresh()
     })
   }
 
@@ -30,6 +37,12 @@ export function ArchiveView({ projects, taskCounts }: ArchiveViewProps) {
         <h1 className="text-[16px] font-semibold text-zinc-900 tracking-tight">보관함</h1>
         <span className="text-[12px] text-zinc-400 tabular-nums tracking-tight">{projects.length}</span>
       </div>
+
+      {error && (
+        <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded">
+          <p className="text-[12px] text-red-700 tracking-tight">{error}</p>
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="bg-white border border-dashed border-zinc-200 rounded p-8 text-center">
@@ -57,15 +70,15 @@ export function ArchiveView({ projects, taskCounts }: ArchiveViewProps) {
                 </div>
               </div>
               <button
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 whitespace-nowrap disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-zinc-200 rounded text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors tracking-tight shrink-0 whitespace-nowrap disabled:opacity-40"
                 onClick={(e) => {
                   e.stopPropagation()
-                  reopen(project.id)
+                  remove(project)
                 }}
                 disabled={isPending}
               >
-                <RotateCcw size={12} />
-                재개
+                <Trash2 size={12} />
+                삭제
               </button>
             </div>
           ))}

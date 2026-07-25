@@ -530,18 +530,18 @@ export async function startNewDashboard(input: {
   return { ok: true, projectId: created.id }
 }
 
-// 대시보드 보관/재개 토글.
-export async function setProjectArchived(projectId: string, archived: boolean): Promise<ActionResult> {
+// 보관함에서 대시보드(회차)를 완전히 삭제한다. 실수로 현재 쓰는 회차가 지워지지 않도록 보관된 회차만 허용한다.
+// 소속 tasks/comments/task_history/project_notes 는 DB CASCADE 로 함께 삭제된다.
+export async function deleteProject(projectId: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
-  const { error } = await supabase
-    .from('projects')
-    .update({
-      status: archived ? 'archived' : 'active',
-      archived_at: archived ? new Date().toISOString() : null,
-    })
-    .eq('id', projectId)
-  if (error) return { ok: false, error: '대시보드 상태 변경에 실패했습니다.' }
+  const { data: project } = await supabase.from('projects').select('status').eq('id', projectId).single()
+  if (!project) return { ok: false, error: '대시보드를 찾을 수 없습니다.' }
+  if (project.status !== 'archived') return { ok: false, error: '보관된 대시보드만 삭제할 수 있습니다.' }
 
+  const { error } = await supabase.from('projects').delete().eq('id', projectId)
+  if (error) return { ok: false, error: '대시보드 삭제에 실패했습니다.' }
+
+  revalidatePath('/archive')
   revalidatePath('/')
   return { ok: true }
 }

@@ -21,6 +21,9 @@
 - 보관함은 좌측 내비에 새 메뉴(`/archive`)로 추가했다. `ArchiveView` 가 `status = 'archived'` 인 프로젝트만 모아 이름·설명·보관일·항목 수(`getProjectTaskCounts`)를 보여주고, 클릭하면 해당 대시보드(`/?project=<id>`)로 이동하며 "재개" 버튼으로 다시 활성화(`setProjectArchived`)할 수 있다.
 - 대시보드 생성 시 선택 입력으로 `projects.description`(0010 마이그레이션)을 추가해, 보관함 목록에서 그 대시보드가 어떤 목적이었는지 알 수 있게 했다.
 
+### 28. 보관함 "재개" 대신 "삭제"
+보관된 회차를 다시 활성화하는 "재개" 기능은 실사용 시나리오에 없어 제거하고, 대신 완전 삭제(`deleteProject`)로 바꿨다. 오작동 방지를 위해 `status = 'archived'` 인 회차만 삭제를 허용한다(활성 회차는 API 단에서 거부). `tasks.project_id` FK 는 원래 `ON DELETE` 동작이 없어(NO ACTION) 프로젝트 삭제 시 FK 위반이 났는데, 0011 마이그레이션에서 `ON DELETE CASCADE` 로 바꿔 프로젝트 삭제 시 소속 tasks 가 함께 지워지고, tasks 에 이미 걸린 CASCADE(comments, task_history)/SET NULL(notification_log)이 연쇄적으로 정리되게 했다. `project_notes` 는 애초에 CASCADE 였으므로 그대로 함께 삭제된다.
+
 ### 1. Vite SPA → Next.js(App Router) 마이그레이션
 
 명세는 Server Actions, 미들웨어, RSC, Vercel Cron, `/tasks/[id]` 딥링크를 전제하지만, 인수받은 산출물은 Vite + React SPA 였다. Vite 에서는 이 요구를 구현할 수 없어 Next.js(App Router)로 마이그레이션했다. 기존 JSX/Tailwind 마크업은 보존하고 라우트 분리와 서버/클라이언트 분리만 수행했다. (사용자 확인을 받은 유일한 지점)
