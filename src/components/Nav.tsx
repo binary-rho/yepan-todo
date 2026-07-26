@@ -22,10 +22,10 @@ export function Nav() {
   }
 
   return (
-    <aside className="w-56 shrink-0 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0">
+    <aside className="w-64 shrink-0 bg-white border-r border-zinc-200 flex flex-col h-screen sticky top-0">
       <div className="px-4 py-4 border-b border-zinc-100">
         <p className="text-[14px] font-semibold text-zinc-900 tracking-tight">
-          BO 세팅 관리
+          예판 진행 관리
         </p>
       </div>
 
