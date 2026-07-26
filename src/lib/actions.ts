@@ -453,11 +453,12 @@ export async function importTeamsMembers(): Promise<ImportMembersResult> {
   }
 }
 
-// 항목/이력에 연결된 멤버는 FK 로 삭제가 막힌다.
+// 담당하던 항목/남긴 이력·댓글은 지우지 않고 남긴 채, 그 사람 참조만 비운다(SET NULL, 0017).
+// 항목은 "미배정" 상태가 되고, 이력/댓글의 작성자는 화면에 "알 수 없음"/"??" 로 표시된다.
 export async function deleteMember(memberId: string): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { error } = await supabase.from('users').delete().eq('id', memberId)
-  if (error) return { ok: false, error: '연결된 항목이나 이력이 있어 삭제할 수 없습니다.' }
+  if (error) return { ok: false, error: '멤버 삭제에 실패했습니다.' }
 
   revalidatePath('/')
   revalidatePath('/templates')

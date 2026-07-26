@@ -148,7 +148,7 @@ export interface Database {
           task_id: string
           from_status: TaskStatusDb | null
           to_status: TaskStatusDb
-          changed_by: string
+          changed_by: string | null
           reason: string | null
           created_at: string
         }
@@ -157,7 +157,7 @@ export interface Database {
           task_id: string
           from_status?: TaskStatusDb | null
           to_status: TaskStatusDb
-          changed_by: string
+          changed_by?: string | null
           reason?: string | null
           created_at?: string
         }
@@ -166,7 +166,7 @@ export interface Database {
           task_id?: string
           from_status?: TaskStatusDb | null
           to_status?: TaskStatusDb
-          changed_by?: string
+          changed_by?: string | null
           reason?: string | null
           created_at?: string
         }
@@ -176,21 +176,21 @@ export interface Database {
         Row: {
           id: string
           task_id: string
-          author_id: string
+          author_id: string | null
           body: string
           created_at: string
         }
         Insert: {
           id?: string
           task_id: string
-          author_id: string
+          author_id?: string | null
           body: string
           created_at?: string
         }
         Update: {
           id?: string
           task_id?: string
-          author_id?: string
+          author_id?: string | null
           body?: string
           created_at?: string
         }

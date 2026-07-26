@@ -13,13 +13,14 @@ export async function getSchedulePhases(): Promise<SchedulePhase[]> {
   return (data ?? []).map(mapSchedulePhase)
 }
 
-type NameResolver = (userId: string) => string
+type NameResolver = (userId: string | null) => string
 
+// 멤버가 삭제되면 이력/메모에 남은 참조가 null 이 될 수 있어(0017), 그 경우도 "알 수 없음" 으로 대체한다.
 async function buildNameResolver(): Promise<NameResolver> {
   const supabase = createSupabaseDbClient()
   const { data } = await supabase.from('users').select('id, name')
   const map = new Map((data ?? []).map((u) => [u.id, u.name]))
-  return (userId: string) => map.get(userId) ?? '알 수 없음'
+  return (userId: string | null) => (userId ? map.get(userId) ?? '알 수 없음' : '알 수 없음')
 }
 
 // 멤버는 회차(프로젝트)마다 따로 관리된다(전역 공유 아님).

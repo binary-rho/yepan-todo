@@ -58,7 +58,8 @@ export function mapTask(row: TaskRow): Task {
 }
 
 // changed_by(uuid)는 화면 표기를 위해 사용자 이름으로 변환한다. (HANDOFF_REPORT 5-4 참조)
-export function mapTaskHistory(row: TaskHistoryRow, resolveName: (userId: string) => string): TaskHistory {
+// 변경한 멤버가 삭제되면 changed_by 가 null 이 될 수 있는데, resolveName 이 "알 수 없음" 으로 대체해준다.
+export function mapTaskHistory(row: TaskHistoryRow, resolveName: (userId: string | null) => string): TaskHistory {
   return {
     id: row.id,
     taskId: row.task_id,

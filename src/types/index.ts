@@ -65,7 +65,8 @@ export interface TaskHistory {
 export interface Comment {
   id: string
   taskId: string
-  authorId: string
+  // 작성자 멤버가 삭제되면 null 이 된다(글 자체는 남기고 작성자 참조만 비운다).
+  authorId: string | null
   body: string
   createdAt: string
 }
