@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { SchedulePhase } from "@/types";
 import { saveSchedulePhases } from "@/lib/actions";
+import { useModalBackdropClose } from "@/hooks/useModalBackdropClose";
 
 interface SchedulePhasesModalProps {
   phases: SchedulePhase[];
@@ -37,6 +38,7 @@ export function SchedulePhasesModal({
   );
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const backdrop = useModalBackdropClose(onClose);
 
   function updateRow(index: number, patch: Partial<PhaseRow>) {
     setRows((prev) =>
@@ -74,7 +76,7 @@ export function SchedulePhasesModal({
   return (
     <div
       className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-xl max-h-[90vh] overflow-y-auto"

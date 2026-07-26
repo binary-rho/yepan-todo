@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { identityInputSchema } from "@/lib/validation";
 import { useCurrentIdentity } from "@/components/CurrentIdentityProvider";
+import { useModalBackdropClose } from "@/hooks/useModalBackdropClose";
 
 // "나는 누구인가"를 본인이 직접 입력한다. 여기 적은 이메일로 회차 멤버와 연결되므로,
 // 멤버 관리에 등록된 이메일과 정확히 같아야 한다(다르면 각 화면에서 멤버가 아니라고 알려준다).
@@ -12,6 +13,7 @@ export function IdentityModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState(identity?.name ?? "");
   const [email, setEmail] = useState(identity?.email ?? "");
   const [error, setError] = useState<string | null>(null);
+  const backdrop = useModalBackdropClose(onClose);
 
   function save() {
     const parsed = identityInputSchema.safeParse({ name, email });
@@ -26,7 +28,7 @@ export function IdentityModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-sm"

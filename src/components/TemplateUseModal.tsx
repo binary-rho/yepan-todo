@@ -7,6 +7,7 @@ import type { ActionResult } from '@/lib/actions'
 import { ENVIRONMENTS, ENV_CONFIG } from '@/lib/constants'
 import { formatDate } from '@/lib/date'
 import { resolveTemplateDueDate } from '@/lib/templateDueDate'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 
 interface TemplateUseModalProps {
   template: Template
@@ -32,6 +33,7 @@ export function TemplateUseModal({ template, items, members, phases, onClose, on
   )
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const backdrop = useModalBackdropClose(onClose)
 
   // 항목마다 저장된 마감일 규칙(일정 기준 ± N일 / 고정 날짜)이 있으면 그걸 쓰고,
   // 규칙이 없는 항목만 아래 기준 마감일을 쓴다.
@@ -50,7 +52,7 @@ export function TemplateUseModal({ template, items, members, phases, onClose, on
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 sticky top-0 bg-white">
           <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">템플릿으로 항목 생성</h2>

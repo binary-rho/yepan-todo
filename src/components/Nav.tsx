@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: "보드", href: "/" },
   { label: "템플릿", href: "/templates" },
   { label: "이전 예판 보관함", href: "/archive" },
+  { label: "예판 BO 세팅 가이드", href: "/guide" },
 ] as const;
 
 // "현재 사용자"는 회차를 옮겨도 유지되는 브라우저 설정이라 항상 보이는 이 자리에 둔다.

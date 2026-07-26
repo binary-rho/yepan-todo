@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 
 export function RejectModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (reason: string) => void }) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState(false)
+  const backdrop = useModalBackdropClose(onClose)
 
   function submit() {
     if (!reason.trim()) { setError(true); return }
@@ -13,7 +15,7 @@ export function RejectModal({ onClose, onConfirm }: { onClose: () => void; onCon
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-sm" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
           <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">재설정 사유 입력</h2>

@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import type { Environment, SchedulePhase, Task, User } from '@/types'
 import type { ActionResult } from '@/lib/actions'
 import { ENVIRONMENTS, ENV_CONFIG } from '@/lib/constants'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 
 export interface TaskFormData {
   title: string
@@ -44,6 +45,7 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   const [errs, setErrs] = useState<Record<string, string>>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const backdrop = useModalBackdropClose(onClose)
 
   const assignees = userList
 
@@ -74,7 +76,7 @@ export function TaskModal({ task, userList, phases, onClose, onSubmit }: TaskMod
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
           <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">{task ? '항목 수정' : '새 항목 생성'}</h2>

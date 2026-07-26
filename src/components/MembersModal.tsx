@@ -12,6 +12,7 @@ import {
   createMembersBulk,
   importTeamsMembers,
 } from "@/lib/actions";
+import { useModalBackdropClose } from "@/hooks/useModalBackdropClose";
 
 interface MembersModalProps {
   projectId: string;
@@ -73,6 +74,7 @@ export function MembersModal({
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, startImporting] = useTransition();
   const [isAddingImported, startAddingImported] = useTransition();
+  const backdrop = useModalBackdropClose(onClose);
 
   function beginEdit(member: User) {
     setError(null);
@@ -183,7 +185,7 @@ export function MembersModal({
   return (
     <div
       className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-lg max-h-[90vh] overflow-y-auto"

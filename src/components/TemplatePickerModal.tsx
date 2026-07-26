@@ -7,6 +7,7 @@ import type { Environment, SchedulePhase, Template, TemplateItem } from '@/types
 import { createTasksFromTemplate } from '@/lib/actions'
 import { useProjectMember } from '@/components/ProjectMemberProvider'
 import { TemplateUseModal } from '@/components/TemplateUseModal'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 
 interface TemplatePickerModalProps {
   templates: Template[]
@@ -22,6 +23,7 @@ export function TemplatePickerModal({ templates, itemsByTemplate, phases, onClos
   const router = useRouter()
   const { projectId, members, currentUser } = useProjectMember()
   const [selected, setSelected] = useState<Template | null>(null)
+  const backdrop = useModalBackdropClose(onClose)
 
   async function applyTemplate(env: Environment, baseDate: string, assigneeByItemId: Record<string, string>) {
     if (!selected) return { ok: false as const, error: '템플릿을 먼저 선택해주세요.' }
@@ -49,7 +51,7 @@ export function TemplatePickerModal({ templates, itemsByTemplate, phases, onClos
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 shrink-0">
           <div>

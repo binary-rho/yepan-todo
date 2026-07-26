@@ -5,6 +5,7 @@ import { X, Plus, Trash2 } from 'lucide-react'
 import type { Environment, SchedulePhase, Template, TemplateItem } from '@/types'
 import { createTemplate, updateTemplate } from '@/lib/actions'
 import { ENVIRONMENTS, ENV_CONFIG } from '@/lib/constants'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 import {
   TemplateDueRuleField,
   emptyDueRuleDraft,
@@ -63,6 +64,7 @@ export function TemplateEditorModal({ template, initialItems, phases, onClose, o
   )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const backdrop = useModalBackdropClose(onClose)
 
   function updateRow(index: number, patch: Partial<ItemRow>) {
     setRows(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -103,7 +105,7 @@ export function TemplateEditorModal({ template, initialItems, phases, onClose, o
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 sticky top-0 bg-white">
           <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">{template ? '템플릿 수정' : '새 템플릿'}</h2>

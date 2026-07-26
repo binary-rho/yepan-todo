@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { startNewDashboard } from '@/lib/actions'
+import { useModalBackdropClose } from '@/hooks/useModalBackdropClose'
 
 interface NewDashboardModalProps {
   onClose: () => void
@@ -17,6 +18,7 @@ export function NewDashboardModal({ onClose }: NewDashboardModalProps) {
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const backdrop = useModalBackdropClose(onClose)
 
   function create() {
     setError(null)
@@ -36,7 +38,7 @@ export function NewDashboardModal({ onClose }: NewDashboardModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" {...backdrop}>
       <div className="bg-white rounded border border-zinc-200 shadow-md w-full max-w-sm" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
           <h2 className="text-[14px] font-semibold text-zinc-900 tracking-tight">새 대시보드</h2>
