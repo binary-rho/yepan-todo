@@ -19,7 +19,10 @@ export interface Mention {
 
 export interface NotificationMessage {
   text: string
+  // 앞쪽에 붙는 기본 태그(주로 담당자).
   mention?: Mention
+  // 본문 끝에 "cc. @이름1, @이름2" 로 붙는 참조 태그.
+  ccMentions?: Mention[]
 }
 
 export interface NotificationTransport {
@@ -78,13 +81,25 @@ function buildCard(body: TextBlock[], msteamsMention: object) {
   }
 }
 
-function buildCardPayload({ text, mention }: NotificationMessage) {
-  if (!mention) return buildCard(toTextBlocks(text), {})
+function mentionTagOf(mention: Mention): string {
+  return `${MENTION_TAG_OPEN}${mention.name}${MENTION_TAG_CLOSE}`
+}
 
-  const mentionTag = `${MENTION_TAG_OPEN}${mention.name}${MENTION_TAG_CLOSE}`
-  return buildCard(toTextBlocks(`${mentionTag} ${text}`), {
-    entities: [{ type: 'mention', text: mentionTag, mentioned: { id: mention.id, name: mention.name } }],
-  })
+// CC 는 "cc. @이름1, @이름2" 한 줄로 본문 맨 끝에 붙는다.
+const CC_LINE_PREFIX = 'cc.'
+
+function buildCardPayload({ text, mention, ccMentions }: NotificationMessage) {
+  const ccLine = ccMentions && ccMentions.length > 0
+    ? `${CC_LINE_PREFIX} ${ccMentions.map(mentionTagOf).join(', ')}`
+    : null
+  const bodyWithCc = ccLine ? `${text}\n\n${ccLine}` : text
+  const finalText = mention ? `${mentionTagOf(mention)} ${bodyWithCc}` : bodyWithCc
+
+  const allMentions = [...(mention ? [mention] : []), ...(ccMentions ?? [])]
+  if (allMentions.length === 0) return buildCard(toTextBlocks(finalText), {})
+
+  const entities = allMentions.map((m) => ({ type: 'mention', text: mentionTagOf(m), mentioned: { id: m.id, name: m.name } }))
+  return buildCard(toTextBlocks(finalText), { entities })
 }
 
 class WebhookTransport implements NotificationTransport {

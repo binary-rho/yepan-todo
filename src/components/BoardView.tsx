@@ -6,7 +6,7 @@ import { Plus, FileText, Filter, CalendarRange, LayoutDashboard, Lock } from 'lu
 import type { Environment, Project, ProjectNote, SchedulePhase, Task, TaskStatus, Template, TemplateItem, User } from '@/types'
 import { ENVIRONMENTS, ENV_CONFIG, KANBAN_COLUMNS } from '@/lib/constants'
 import { allowedNextStatuses } from '@/lib/transitions'
-import { createTask, changeTaskStatus, changeTaskAssignee, notifyTaskNow } from '@/lib/actions'
+import { createTask, changeTaskStatus, changeTaskAssignee } from '@/lib/actions'
 import { useProjectMember } from '@/components/ProjectMemberProvider'
 import { ProjectMembersButton } from '@/components/ProjectMembersButton'
 import { MembershipAlert } from '@/components/MembershipAlert'
@@ -279,7 +279,7 @@ export function BoardView({
                       readOnly={readOnly}
                       onMove={status => moveToStatus(task.id, status)}
                       onAssigneeChange={assigneeId => handleAssigneeChange(task.id, assigneeId)}
-                      onNotify={() => notifyTaskNow(task.id)}
+                      canNotify={!readOnly}
                     />
                   )
                 })}

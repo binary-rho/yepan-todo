@@ -68,6 +68,7 @@ export function MembersModal({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [channelLink, setChannelLink] = useState("");
   const [importedMembers, setImportedMembers] = useState<
     ImportedMember[] | null
   >(null);
@@ -134,10 +135,14 @@ export function MembersModal({
   }
 
   function runImport() {
+    if (!channelLink.trim()) {
+      setImportError("이 회차 채널의 링크를 붙여넣어주세요.");
+      return;
+    }
     setImportError(null);
     setImportedMembers(null);
     startImporting(async () => {
-      const result = await importTeamsMembers();
+      const result = await importTeamsMembers(channelLink.trim());
       if (!result.ok) {
         setImportError(result.error);
         return;
@@ -209,19 +214,32 @@ export function MembersModal({
         </div>
 
         <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-zinc-400 tracking-tight flex-1">
-              이메일은 Teams 알림에서 담당자를 @태그할 때 쓰입니다. 실제
-              조직(Teams) 이메일을 입력해주세요.
+          <p className="text-[11px] text-zinc-400 tracking-tight">
+            이메일은 Teams 알림에서 담당자를 @태그할 때 쓰입니다. 실제
+            조직(Teams) 이메일을 입력해주세요.
+          </p>
+
+          <div>
+            <p className="text-[11px] text-zinc-400 tracking-tight mb-1">
+              이 회차 Teams 채널에서 <b>&quot;채널 링크 복사&quot;</b>로 얻은
+              링크를 붙여넣으면, 그 채널에 참여 중인 멤버를 가져옵니다.
             </p>
-            <button
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[12px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 disabled:opacity-50"
-              onClick={runImport}
-              disabled={isImporting}
-            >
-              <DownloadCloud size={12} />
-              {isImporting ? "가져오는 중..." : "팀즈에서 가져오기"}
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 min-w-0 px-2.5 py-1.5 border border-zinc-200 rounded text-[12px] tracking-tight outline-none focus:border-zinc-400"
+                placeholder="https://teams.microsoft.com/l/channel/..."
+                value={channelLink}
+                onChange={(e) => setChannelLink(e.target.value)}
+              />
+              <button
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[12px] border border-zinc-200 rounded text-zinc-600 hover:bg-zinc-50 transition-colors tracking-tight shrink-0 disabled:opacity-50"
+                onClick={runImport}
+                disabled={isImporting}
+              >
+                <DownloadCloud size={12} />
+                {isImporting ? "가져오는 중..." : "가져오기"}
+              </button>
+            </div>
           </div>
 
           {importError && (

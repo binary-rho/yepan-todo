@@ -74,6 +74,9 @@ export type MemberInput = z.infer<typeof memberInputSchema>
 // 브라우저에 저장하는 "현재 사용자"(본인 정보). 회차 멤버와 이메일로 매칭되므로 멤버 입력과 같은 규칙을 쓴다.
 export const identityInputSchema = memberInputSchema.omit({ teamRole: true })
 
+// Teams 채널의 "채널 링크 복사"로 얻는 URL. groupId(팀) 와 채널 id 를 여기서 뽑아낸다.
+export const teamsChannelLinkSchema = z.string().trim().url('올바른 채널 링크가 아닙니다. Teams 채널의 "채널 링크 복사"로 얻은 URL을 붙여넣어주세요.')
+
 export const memberImportItemSchema = z.object({
   name: z.string().trim().min(1),
   email: emailSchema,
@@ -125,6 +128,15 @@ export type TemplateInput = z.infer<typeof templateInputSchema>
 export type TemplateItemInput = z.infer<typeof templateItemSchema>
 
 export const webhookUrlSchema = z.string().trim().url('올바른 URL 형식이 아닙니다.')
+
+// 수동 호출(알림) 팝업에서 사용자가 문구를 고치고 CC 를 추가해 보낼 때 쓴다.
+const MANUAL_CALL_TEXT_MAX_LENGTH = 1000
+const MANUAL_CALL_CC_MAX_COUNT = 10
+export const manualCallInputSchema = z.object({
+  text: z.string().trim().min(1, '문구를 입력해주세요.').max(MANUAL_CALL_TEXT_MAX_LENGTH, `문구는 ${MANUAL_CALL_TEXT_MAX_LENGTH}자 이하로 입력해주세요.`),
+  ccMemberIds: z.array(z.string().min(1)).max(MANUAL_CALL_CC_MAX_COUNT, `CC는 최대 ${MANUAL_CALL_CC_MAX_COUNT}명까지 추가할 수 있습니다.`).optional(),
+})
+export type ManualCallInput = z.infer<typeof manualCallInputSchema>
 
 export const schedulePhaseSchema = z.object({
   name: z.string().trim().min(1, '국면 이름을 입력해주세요.'),

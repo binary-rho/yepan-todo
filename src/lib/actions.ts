@@ -7,7 +7,7 @@ import { mapTemplateItem, toTaskInsert, toTaskUpdate } from '@/lib/db/mappers'
 import { getSchedulePhases } from '@/lib/db/queries'
 import { resolveTemplateDueDate } from '@/lib/templateDueDate'
 import { writeSetting, WEBHOOK_SETTING_KEY } from '@/lib/db/settings'
-import { notifyTaskAssigned, notifyRejected, sendManualCall } from '@/lib/notifications'
+import { notifyTaskAssigned, notifyRejected, sendManualCall, buildManualCallDraft, type Mention } from '@/lib/notifications'
 import {
   taskInputSchema,
   statusChangeSchema,
@@ -21,6 +21,8 @@ import {
   projectNameSchema,
   projectDescriptionSchema,
   projectNoteSchema,
+  manualCallInputSchema,
+  teamsChannelLinkSchema,
 } from '@/lib/validation'
 import type { TemplateInput } from '@/lib/validation'
 import type { TaskStatus } from '@/types'
@@ -135,9 +137,23 @@ export async function changeTaskAssignee(taskId: string, assigneeId: string): Pr
   return { ok: true }
 }
 
+// 알림 팝업을 열 때 미리 채워둘 기본 문구를 돌려준다. 실제 발송 문구와 규칙이 같다.
+export async function getManualCallDraft(taskId: string): Promise<ActionResult & { text?: string }> {
+  const supabase = createSupabaseDbClient()
+  const { data: task } = await supabase.from('tasks').select('id, title, assignee_id').eq('id', taskId).maybeSingle()
+  if (!task) return { ok: false, error: '항목을 찾을 수 없습니다.' }
+
+  const { data: assignee } = task.assignee_id
+    ? await supabase.from('users').select('name').eq('id', task.assignee_id).maybeSingle()
+    : { data: null }
+
+  return { ok: true, text: buildManualCallDraft({ taskId: task.id, title: task.title, assigneeName: assignee?.name ?? null }) }
+}
+
 // 항목 담당자에게 즉시 알림(호출)을 보낸다. Teams 웹훅이면 담당자를 @태그하고,
 // 담당자가 없는 항목이면 태그 없이 채널에만 보낸다(담당 지정 요청 성격).
-export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
+// input 을 주면(알림 팝업에서 문구를 고치고 CC 를 추가한 경우) 그 문구/CC 를 그대로 쓴다.
+export async function notifyTaskNow(taskId: string, input?: unknown): Promise<ActionResult> {
   const supabase = createSupabaseDbClient()
   const { data: task } = await supabase
     .from('tasks')
@@ -149,9 +165,27 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
   const writeError = await projectWriteError(supabase, task.project_id)
   if (writeError) return { ok: false, error: writeError }
 
+  let overrides: { text: string; ccMemberIds?: string[] } | null = null
+  if (input !== undefined) {
+    const parsed = manualCallInputSchema.safeParse(input)
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+    overrides = parsed.data
+  }
+
   const { data: assignee } = task.assignee_id
     ? await supabase.from('users').select('name, email').eq('id', task.assignee_id).maybeSingle()
     : { data: null }
+
+  let ccMentions: Mention[] | undefined
+  if (overrides?.ccMemberIds && overrides.ccMemberIds.length > 0) {
+    // 같은 회차 멤버만 CC 로 태그할 수 있게 project_id 로 한 번 더 좁힌다.
+    const { data: ccUsers } = await supabase
+      .from('users')
+      .select('name, email')
+      .eq('project_id', task.project_id)
+      .in('id', overrides.ccMemberIds)
+    ccMentions = (ccUsers ?? []).map((u) => ({ id: u.email, name: u.name }))
+  }
 
   const mention = assignee?.email ? { id: assignee.email, name: assignee.name } : undefined
   const result = await sendManualCall({
@@ -159,6 +193,8 @@ export async function notifyTaskNow(taskId: string): Promise<ActionResult> {
     title: task.title,
     assigneeName: assignee?.name ?? null,
     mention,
+    ccMentions,
+    text: overrides?.text,
   })
   if (!result.ok) {
     if (result.reason === 'no_webhook') {
@@ -405,17 +441,38 @@ export type ImportMembersResult =
   | { ok: true; members: { name: string; email: string }[] }
   | { ok: false; error: string }
 
-// Microsoft Graph 로 팀즈 채널(팀) 멤버를 조회한다. 연동 정보가 없거나 실패하면 그냥 실패를 돌려준다.
-// 필요한 환경변수: MS_GRAPH_TENANT_ID, MS_GRAPH_CLIENT_ID, MS_GRAPH_CLIENT_SECRET, MS_GRAPH_TEAM_ID
-export async function importTeamsMembers(): Promise<ImportMembersResult> {
+// Teams "채널 링크 복사" URL 형태: https://teams.microsoft.com/l/channel/<channelId(인코딩됨)>/<채널이름>?groupId=<teamId>&tenantId=...
+// 팀은 그대로 두고 회차마다 채널만 새로 파서 그 채널에 참여 멤버를 초대하는 운영 방식이라,
+// 채널마다 실제 멤버가 다르므로 팀 전체 멤버가 아니라 "그 채널"의 멤버만 조회해야 한다.
+function parseTeamsChannelLink(link: string): { teamId: string; channelId: string } | null {
+  try {
+    const url = new URL(link)
+    const teamId = url.searchParams.get('groupId')
+    const match = url.pathname.match(/\/channel\/([^/]+)/)
+    if (!teamId || !match) return null
+    return { teamId, channelId: decodeURIComponent(match[1]) }
+  } catch {
+    return null
+  }
+}
+
+// Microsoft Graph 로 팀즈 "채널" 멤버를 조회한다. 연동 정보가 없거나 실패하면 그냥 실패를 돌려준다.
+// 필요한 환경변수: MS_GRAPH_TENANT_ID, MS_GRAPH_CLIENT_ID, MS_GRAPH_CLIENT_SECRET
+// channelLink: Teams 에서 그 회차 채널의 "채널 링크 복사"로 얻은 URL(회차마다 다름).
+export async function importTeamsMembers(channelLink: unknown): Promise<ImportMembersResult> {
+  const parsedLink = teamsChannelLinkSchema.safeParse(channelLink)
+  if (!parsedLink.success) return { ok: false, error: parsedLink.error.issues[0].message }
+
+  const ids = parseTeamsChannelLink(parsedLink.data)
+  if (!ids) return { ok: false, error: '채널 링크에서 팀/채널 정보를 읽지 못했습니다. Teams 채널의 "채널 링크 복사"로 얻은 URL인지 확인해주세요.' }
+
   const tenantId = process.env.MS_GRAPH_TENANT_ID
   const clientId = process.env.MS_GRAPH_CLIENT_ID
   const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET
-  const teamId = process.env.MS_GRAPH_TEAM_ID
-  if (!tenantId || !clientId || !clientSecret || !teamId) {
+  if (!tenantId || !clientId || !clientSecret) {
     return {
       ok: false,
-      error: 'Microsoft Graph 연동 정보가 설정되지 않았습니다. (MS_GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET/TEAM_ID)',
+      error: 'Microsoft Graph 연동 정보가 설정되지 않았습니다. (MS_GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET)',
     }
   }
 
@@ -434,11 +491,12 @@ export async function importTeamsMembers(): Promise<ImportMembersResult> {
     const tokenJson = (await tokenRes.json()) as GraphTokenResponse
     if (!tokenJson.access_token) return { ok: false, error: 'Microsoft 인증에 실패했습니다.' }
 
-    const membersRes = await fetch(`https://graph.microsoft.com/v1.0/teams/${teamId}/members`, {
-      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-    })
+    const membersRes = await fetch(
+      `https://graph.microsoft.com/v1.0/teams/${ids.teamId}/channels/${encodeURIComponent(ids.channelId)}/members`,
+      { headers: { Authorization: `Bearer ${tokenJson.access_token}` } },
+    )
     if (!membersRes.ok) {
-      return { ok: false, error: '팀 멤버 조회에 실패했습니다. 앱 권한/관리자 동의를 확인해주세요.' }
+      return { ok: false, error: '채널 멤버 조회에 실패했습니다. 앱 권한(ChannelMember.Read.All)/관리자 동의를 확인해주세요.' }
     }
     const membersJson = (await membersRes.json()) as GraphMembersResponse
     const members = (membersJson.value ?? [])

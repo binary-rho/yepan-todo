@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, Link as LinkIcon, ExternalLink, Lock } from 'lucide-react'
 import type { Comment, SchedulePhase, Task, TaskHistory, TaskStatus, User } from '@/types'
 import { formatDateTime } from '@/lib/date'
-import { changeTaskStatus, addComment, updateTask, notifyTaskNow } from '@/lib/actions'
+import { changeTaskStatus, addComment, updateTask } from '@/lib/actions'
 import { allowedNextStatuses } from '@/lib/transitions'
 import { useProjectMember } from '@/components/ProjectMemberProvider'
 import { ProjectMembersButton } from '@/components/ProjectMembersButton'
@@ -14,6 +14,7 @@ import { StatusBadge, EnvBadge } from '@/components/badges'
 import { AssigneeDisplay, DueDateDisplay } from '@/components/displays'
 import { RejectModal } from '@/components/RejectModal'
 import { TaskModal, type TaskFormData } from '@/components/TaskModal'
+import { NotifyModal } from '@/components/NotifyModal'
 
 interface TaskDetailViewProps {
   task: Task
@@ -40,6 +41,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
   const [commentText, setCommentText] = useState('')
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [showNotify, setShowNotify] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notifyMessage, setNotifyMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -86,18 +88,6 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
 
   // 담당자가 없으면 부를 사람이 없으므로 태그 없이 채널에만 나간다(담당 지정 요청 성격).
   const notifyLabel = assignee ? '담당자에게 알림' : '채널에 알림 (담당자 미지정)'
-
-  function handleNotify() {
-    setNotifyMessage(null)
-    startTransition(async () => {
-      const result = await notifyTaskNow(task.id)
-      if (!result.ok) {
-        setNotifyMessage(result.error)
-        return
-      }
-      setNotifyMessage(assignee ? '담당자에게 알림을 보냈습니다.' : '사람 태그 없이 채널에 알림을 보냈습니다.')
-    })
-  }
 
   async function handleEdit(data: TaskFormData) {
     const result = await updateTask(task.id, data)
@@ -335,7 +325,7 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
             <div className="bg-white border border-zinc-200 rounded p-4 space-y-3">
               <button
                 className="w-full px-3 py-1.5 text-[13px] border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 transition-colors tracking-tight disabled:opacity-40"
-                onClick={handleNotify}
+                onClick={() => setShowNotify(true)}
                 disabled={isPending}
               >
                 {notifyLabel}
@@ -368,6 +358,16 @@ export function TaskDetailView({ task, userList, comments, histories, screenshot
           phases={phases}
           onClose={() => setShowEdit(false)}
           onSubmit={handleEdit}
+        />
+      )}
+
+      {showNotify && (
+        <NotifyModal
+          taskId={task.id}
+          assignee={assignee}
+          members={userList}
+          onClose={() => setShowNotify(false)}
+          onSent={setNotifyMessage}
         />
       )}
     </div>
